@@ -1,1 +1,1 @@
-web: gunicorn legalcrm.wsgi
+web: gunicorn legal_crm.wsgi
