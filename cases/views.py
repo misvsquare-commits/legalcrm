@@ -1008,7 +1008,7 @@ def _parse_email_lines(raw_text):
 def dashboard(request):
     from .models import GlobalAlertRecipient
 
-    _run_daily_alert_jobs_if_due()
+    # _run_daily_alert_jobs_if_due()
     today         = timezone.now().date()
     next_month    = today + timezone.timedelta(days=30)   # Change 5: 30 days
     cases_qs      = _base_queryset(request.user)
@@ -1124,7 +1124,7 @@ def manage_global_recipients(request):
 
 @login_required
 def case_list(request):
-    _run_daily_alert_jobs_if_due()
+    # _run_daily_alert_jobs_if_due()
     filter_form = CaseFilterForm(request.GET)
     cases = _base_queryset(request.user)
 
