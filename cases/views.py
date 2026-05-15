@@ -1059,8 +1059,12 @@ def run_alerts_now(request):
         messages.error(request, 'Only admin/lawyer can run alert jobs manually.')
         return redirect('dashboard')
 
+   try:
     sent = dispatch_hearing_reminders()
     dispatch_overdue_notifications()
+except Exception as e:
+    print("Alert error:", e)
+    sent = 0
     messages.success(request, f'Alert job completed. Hearing emails sent: {sent}.')
     return redirect('dashboard')
 
