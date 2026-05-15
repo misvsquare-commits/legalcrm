@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-xl-9">
+    <div class="card">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-briefcase"></i> {{ title }}
+      </div>
+      <div class="card-body p-4">
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger">{% for e in form.non_field_errors %}{{ e }}{% endfor %}</div>
+          {% endif %}
+
+          <!-- ── Section 1: Case Identity ─────────────────────── -->
+          <div class="mb-4">
+            <h6 class="section-heading"><i class="bi bi-hash me-1"></i>Case Identity</h6>
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label fw-semibold fs-xs">Case Number <span class="text-danger">*</span></label>
+                {{ form.case_number }}
+                {% if form.case_number.errors %}<div class="invalid-feedback d-block">{{ form.case_number.errors.0 }}</div>{% endif %}
+              </div>
+              <div class="col-md-5">
+                <label class="form-label fw-semibold fs-xs">Case Title <span class="text-danger">*</span></label>
+                {{ form.title }}
+                {% if form.title.errors %}<div class="invalid-feedback d-block">{{ form.title.errors.0 }}</div>{% endif %}
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold fs-xs">Case Type <span class="text-danger">*</span></label>
+                {{ form.case_type }}
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Section 2: Project ──────────────────────────── -->
+          <div class="mb-4">
+            <h6 class="section-heading"><i class="bi bi-folder me-1"></i>Project / Matter</h6>
+            <div class="row g-3">
+              <div class="col-md-12">
+                <label class="form-label fw-semibold fs-xs">Project Name</label>
+                {{ form.project }}
+                <div class="form-text">Group this case under a project or matter (e.g., "Land Acquisition Phase II")</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Section 3: Court Info ───────────────────────── -->
+          <div class="mb-4">
+            <h6 class="section-heading"><i class="bi bi-building me-1"></i>Court Information</h6>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold fs-xs">Court Name <span class="text-danger">*</span></label>
+                {{ form.court_name }}
+                {% if form.court_name.errors %}<div class="invalid-feedback d-block">{{ form.court_name.errors.0 }}</div>{% endif %}
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold fs-xs">Status <span class="text-danger">*</span></label>
+                {{ form.status }}
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold fs-xs">Assigned Lawyer</label>
+                {{ form.assigned_to }}
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Section 4: Parties ──────────────────────────── -->
+          <div class="mb-4">
+            <h6 class="section-heading"><i class="bi bi-people me-1"></i>Parties</h6>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold fs-xs">Petitioner / Plaintiff</label>
+                {{ form.petitioner }}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold fs-xs">Respondent / Defendant</label>
+                {{ form.respondent }}
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Section 5: Dates ────────────────────────────── -->
+          <div class="mb-4">
+            <h6 class="section-heading"><i class="bi bi-calendar3 me-1"></i>Dates</h6>
+            <div class="row g-3">
+              <div class="col-md-3">
+                <label class="form-label fw-semibold fs-xs">Filing Date <span class="text-danger">*</span></label>
+                {{ form.filing_date }}
+                {% if form.filing_date.errors %}<div class="invalid-feedback d-block">{{ form.filing_date.errors.0 }}</div>{% endif %}
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold fs-xs">
+                  Last Hearing Date
+                  <span class="ms-1" data-bs-toggle="tooltip" title="The date of the most recent hearing that already happened">
+                    <i class="bi bi-info-circle text-muted" style="font-size:11px"></i>
+                  </span>
+                </label>
+                {{ form.last_hearing_date }}
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold fs-xs">
+                  Next Hearing Date
+                  <span class="ms-1" data-bs-toggle="tooltip" title="The upcoming scheduled hearing date">
+                    <i class="bi bi-info-circle text-muted" style="font-size:11px"></i>
+                  </span>
+                </label>
+                {{ form.next_hearing_date }}
+              </div>
+            </div>
+
+            <!-- Visual date flow indicator -->
+            <div id="dateFlow" class="mt-3 p-3 rounded" style="background:#f9fafb;border:1px solid #e5e7eb;display:none">
+              <div class="d-flex align-items-center gap-2 flex-wrap" style="font-size:12px;color:#6b7280">
+                <span><i class="bi bi-flag me-1 text-secondary"></i>Filed: <strong id="flowFiling">—</strong></span>
+                <i class="bi bi-arrow-right text-muted"></i>
+                <span><i class="bi bi-clock-history me-1 text-warning"></i>Last Hearing: <strong id="flowLast">—</strong></span>
+                <i class="bi bi-arrow-right text-muted"></i>
+                <span><i class="bi bi-calendar-event me-1 text-success"></i>Next Hearing: <strong id="flowNext">—</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Section 6: Calendar Sync ────────────────────── -->
+          <div class="mb-4">
+            <h6 class="section-heading"><i class="bi bi-calendar-plus me-1"></i>Calendar Sync (Optional)</h6>
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label fw-semibold fs-xs">Sync Hearing to Email Calendars</label>
+                {{ form.calendar_emails }}
+                <div class="form-text">{{ form.calendar_emails.help_text }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Section 7: Description ──────────────────────── -->
+          <div class="mb-4">
+            <h6 class="section-heading"><i class="bi bi-text-paragraph me-1"></i>Description</h6>
+            {{ form.description }}
+          </div>
+
+          <!-- Actions -->
+          <div class="d-flex gap-3 pt-3 border-top">
+            <button type="submit" class="btn btn-navy px-4">
+              <i class="bi bi-check-lg me-1"></i>
+              {% if case %}Update Case{% else %}Create Case{% endif %}
+            </button>
+            {% if case %}
+            <a href="{% url 'case_detail' case.pk %}" class="btn btn-outline-secondary">
+              <i class="bi bi-x me-1"></i>Cancel
+            </a>
+            {% else %}
+            <a href="{% url 'case_list' %}" class="btn btn-outline-secondary">
+              <i class="bi bi-x me-1"></i>Cancel
+            </a>
+            {% endif %}
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.section-heading {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #6b7280;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 8px;
+  margin-bottom: 0;
+}
+.fs-xs { font-size: 13px; }
+.btn-navy { background:#0f1b35;color:white;border:none; }
+.btn-navy:hover { background:#1a2d52;color:white; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Initialize Bootstrap tooltips
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+
+// Live date-flow preview
+const filingEl = document.querySelector('[name="filing_date"]');
+const lastEl   = document.querySelector('[name="last_hearing_date"]');
+const nextEl   = document.querySelector('[name="next_hearing_date"]');
+const flowBox  = document.getElementById('dateFlow');
+
+function fmtDate(val){
+  if(!val) return '—';
+  const d = new Date(val);
+  return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+}
+
+function updateFlow(){
+  const hasAny = filingEl.value || lastEl.value || nextEl.value;
+  flowBox.style.display = hasAny ? 'block' : 'none';
+  document.getElementById('flowFiling').textContent = fmtDate(filingEl.value);
+  document.getElementById('flowLast').textContent   = fmtDate(lastEl.value);
+  document.getElementById('flowNext').textContent   = fmtDate(nextEl.value);
+}
+
+[filingEl, lastEl, nextEl].forEach(el => el && el.addEventListener('change', updateFlow));
+updateFlow(); // run on page load for edit form
+</script>
+{% endblock %}

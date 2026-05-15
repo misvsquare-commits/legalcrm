@@ -1,0 +1,242 @@
+{% extends 'base.html' %}
+{% block title %}Generate Document{% endblock %}
+{% block page_title %}Document Generator{% endblock %}
+
+{% block content %}
+<div class="row">
+<div class="col-lg-5">
+
+  <div class="card mb-4">
+    <div class="card-header d-flex align-items-center gap-2" style="background:#faf5ff;border-bottom-color:#e9d5ff">
+      <i class="bi bi-stars" style="color:#7c3aed"></i>
+      <span class="fw-semibold" style="color:#5b21b6">AI Document Generator</span>
+      <span class="badge ms-1" style="background:#ede9fe;color:#5b21b6;font-size:10px">Template-based</span>
+    </div>
+    <div class="card-body">
+      <div class="mb-3 p-3 rounded" style="background:#f9fafb;border:1px solid #e5e7eb">
+        <div class="fw-semibold" style="font-size:14px;color:#0f1b35">{{ case.title }}</div>
+        <div class="text-muted" style="font-size:12px">{{ case.case_number }} · {{ case.court_name }}</div>
+        {% if case.petitioner %}<div class="text-muted" style="font-size:12px">{{ case.petitioner }} vs {{ case.respondent }}</div>{% endif %}
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold" style="font-size:13px">Document Type <span class="text-danger">*</span></label>
+        {{ form.template_type }}
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold" style="font-size:13px">Additional Instructions</label>
+        {{ form.additional_notes }}
+      </div>
+
+      <button class="btn w-100" id="generateBtn" style="background:#5b21b6;color:white;border:none;font-weight:600" onclick="generateDocument()">
+        <i class="bi bi-stars me-2"></i>Generate Document
+      </button>
+    </div>
+  </div>
+
+  <!-- Case data used -->
+  <div class="card">
+    <div class="card-header" style="font-size:12px;font-weight:600">Fields auto-filled from case</div>
+    <div class="card-body p-3">
+      <div class="field-row"><span>Case No.</span><strong>{{ case.case_number }}</strong></div>
+      <div class="field-row"><span>Court</span><strong>{{ case.court_name }}</strong></div>
+      <div class="field-row"><span>Case Type</span><strong>{{ case.get_case_type_display }}</strong></div>
+      <div class="field-row"><span>Petitioner</span><strong>{{ case.petitioner|default:"—" }}</strong></div>
+      <div class="field-row"><span>Respondent</span><strong>{{ case.respondent|default:"—" }}</strong></div>
+      <div class="field-row"><span>Filing Date</span><strong>{{ case.filing_date|date:"d M Y" }}</strong></div>
+      <div class="field-row"><span>Lawyer</span><strong>{{ case.assigned_to.get_full_name|default:"—" }}</strong></div>
+      {% if case.assigned_to.bar_number %}
+      <div class="field-row"><span>Bar No.</span><strong>{{ case.assigned_to.bar_number }}</strong></div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<div class="col-lg-7 mt-3 mt-lg-0">
+  <!-- Loading state -->
+  <div id="docLoading" style="display:none" class="text-center py-5">
+    <div class="spinner-border mb-3" style="color:#7c3aed;width:40px;height:40px" role="status"></div>
+    <p class="fw-semibold" style="color:#5b21b6;font-size:15px">Generating draft…</p>
+    <p class="text-muted" style="font-size:13px">Using your case fields + standard templates</p>
+  </div>
+
+  <!-- Generated document output -->
+  <div id="docOutput" style="display:none">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h6 class="mb-0" style="font-weight:600;color:#0f1b35" id="docTitle">Document Draft</h6>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-secondary" onclick="copyDocument(this)">
+          <i class="bi bi-clipboard me-1"></i>Copy
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="downloadDocument()">
+          <i class="bi bi-download me-1"></i>Download .txt
+        </button>
+        <button class="btn btn-sm" style="background:#5b21b6;color:white;border:none" onclick="saveAsUpdate(this)">
+          <i class="bi bi-save me-1"></i>Save to Case
+        </button>
+      </div>
+    </div>
+
+    <div class="card" style="border:1.5px solid #e9d5ff">
+      <div class="card-body">
+        <div id="docText" style="font-family:Georgia,serif;font-size:14px;line-height:1.85;color:#1a1a2e;white-space:pre-wrap;min-height:400px"></div>
+      </div>
+    </div>
+
+    <div class="mt-3 p-2 rounded" style="background:#fef3c7;border:1px solid #fcd34d;font-size:12px;color:#92400e">
+      <i class="bi bi-exclamation-triangle me-1"></i>
+      This is an AI-generated draft. Review carefully before use. Verify all legal citations, party names, and court references. This does not constitute legal advice.
+    </div>
+  </div>
+
+  <!-- Placeholder -->
+  <div id="docPlaceholder" class="text-center py-5">
+    <i class="bi bi-file-earmark-text text-muted" style="font-size:56px;display:block;margin-bottom:16px;opacity:.25"></i>
+    <p class="fw-semibold" style="font-size:16px;color:#374151">Select a template and click Generate</p>
+    <p class="text-muted" style="font-size:13px;max-width:360px;margin:0 auto">A structured, court-ready draft is created from standard templates using your saved case details. Review and edit before filing.</p>
+  </div>
+</div>
+</div>
+
+<style>
+.field-row { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #f3f4f6; font-size:12px; }
+.field-row span { color:#6b7280; }
+.field-row:last-child { border-bottom:none; }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CASE_PK = {{ case.pk }};
+const CASE_DATA = {
+    case_number:  '{{ case.case_number }}',
+    title:        '{{ case.title|escapejs }}',
+    court:        '{{ case.court_name|escapejs }}',
+    case_type:    '{{ case.get_case_type_display }}',
+    petitioner:   '{{ case.petitioner|escapejs }}',
+    respondent:   '{{ case.respondent|escapejs }}',
+    filing_date:  '{{ case.filing_date|date:"d M Y" }}',
+    lawyer:       '{{ case.assigned_to.get_full_name|default:case.assigned_to.username|default:""|escapejs }}',
+    bar_number:   '{{ case.assigned_to.bar_number|default:""|escapejs }}',
+    description:  '{{ case.description|truncatechars:300|escapejs }}',
+    next_hearing: '{{ case.next_hearing_date|date:"d M Y"|default:"Not scheduled" }}',
+};
+
+const TEMPLATE_PROMPTS = {
+    vakalatnama: `Draft a formal Vakalatnama for the following case. Use standard Indian legal format. Include all standard clauses and authorisations.`,
+    application: `Draft a formal court application/petition opening section. Include case title, court heading, parties, and the relief sought paragraph.`,
+    affidavit:   `Draft an affidavit format for supporting documents. Include the deponent declaration, verification clause, and standard notarisation block.`,
+    notice:      `Draft a formal legal notice. Include sender/recipient details, subject matter, facts, demands, and consequences of non-compliance.`,
+    reply:       `Draft a reply/written statement structure. Include the preliminary objections section, para-wise reply format, and prayer clause.`,
+};
+
+function _docHeader() {
+    return `IN THE COURT OF ${CASE_DATA.court}\n\nCase No.: ${CASE_DATA.case_number}\nTitle: ${CASE_DATA.title}\n\n${(CASE_DATA.petitioner || '[FILL IN: Petitioner]')}  …Petitioner\nVERSUS\n${(CASE_DATA.respondent || '[FILL IN: Respondent]')}  …Respondent\n\n`;
+}
+
+function _templateDraft(templateType, notes) {
+    const hdr = _docHeader();
+    const common = `Filed on: ${CASE_DATA.filing_date}\nNext Hearing: ${CASE_DATA.next_hearing}\nCounsel: ${CASE_DATA.lawyer}${CASE_DATA.bar_number ? ' (Bar No. ' + CASE_DATA.bar_number + ')' : ''}\n\n`;
+    const instructions = notes ? `Special Instructions:\n${notes}\n\n` : '';
+
+    switch (templateType) {
+        case 'vakalatnama':
+            return `${hdr}VAKALATNAMA\n\n${common}${instructions}I, [FILL IN: Name of Party], do hereby appoint and authorise ${CASE_DATA.lawyer || '[FILL IN: Advocate name]'} to appear and act on my behalf in the above matter.\n\n[Add standard vakalatnama clauses here]\n\nPlace: [FILL IN]\nDate: [FILL IN]\n\nSignature: ____________________\nName: [FILL IN]\n`;
+        case 'application':
+            return `${hdr}APPLICATION\n\n${common}${instructions}MOST RESPECTFULLY SHOWETH:\n1. That the present application is being filed for [FILL IN: purpose/relief].\n2. That the facts of the case in brief are as under:\n   - ${CASE_DATA.description || '[FILL IN: brief facts]'}\n\nPRAYER\nIn view of the above, it is respectfully prayed that this Hon’ble Court may be pleased to:\n(a) [FILL IN: relief]\n(b) pass any other order(s) deemed fit.\n\nPlace: [FILL IN]\nDate: [FILL IN]\n\nThrough Counsel,\n${CASE_DATA.lawyer || '[FILL IN: Advocate name]'}\n`;
+        case 'affidavit':
+            return `${hdr}AFFIDAVIT\n\n${common}${instructions}I, [FILL IN: Deponent name], aged about [FILL IN], residing at [FILL IN], do hereby solemnly affirm and state as under:\n1. That I am [FILL IN: relationship/role] and competent to swear this affidavit.\n2. That the accompanying application/pleading is true and correct to my knowledge.\n\nVERIFICATION\nVerified at [FILL IN] on this [FILL IN] day of [FILL IN] that the contents are true.\n\nDeponent: ____________________\n`;
+        case 'notice':
+            return `LEGAL NOTICE\n\n${common}${instructions}To,\n[FILL IN: Recipient name/address]\n\nSubject: Legal Notice regarding ${CASE_DATA.title} (${CASE_DATA.case_number})\n\nSir/Madam,\n1. That our client ${CASE_DATA.petitioner || '[FILL IN: client name]'} states the following facts:\n   - ${CASE_DATA.description || '[FILL IN: facts]'}\n\nDemand:\n- You are called upon to [FILL IN: demand/action] within [FILL IN: time] failing which appropriate legal proceedings shall be initiated.\n\nYours faithfully,\n${CASE_DATA.lawyer || '[FILL IN: Advocate name]'}\n`;
+        case 'reply':
+            return `${hdr}WRITTEN STATEMENT / REPLY\n\n${common}${instructions}PRELIMINARY OBJECTIONS\n1. [FILL IN: objection]\n\nPARA-WISE REPLY\nPara 1: [FILL IN]\nPara 2: [FILL IN]\n\nPRAYER\nIt is respectfully prayed that the claim/petition may be dismissed.\n\nThrough Counsel,\n${CASE_DATA.lawyer || '[FILL IN: Advocate name]'}\n`;
+        default:
+            return `${hdr}${common}${instructions}[FILL IN: document content]`;
+    }
+}
+
+async function generateDocument() {
+    const templateType = document.querySelector('[name="template_type"]').value;
+    const notes = document.querySelector('[name="additional_notes"]').value;
+
+    document.getElementById('docPlaceholder').style.display = 'none';
+    document.getElementById('docOutput').style.display      = 'none';
+    document.getElementById('docLoading').style.display     = 'block';
+    document.getElementById('generateBtn').disabled         = true;
+    document.getElementById('docTitle').textContent = document.querySelector('[name="template_type"] option:checked').text + ' — Draft';
+
+    let output = '';
+    try {
+        const res = await fetch(`/cases/${CASE_PK}/gemini/document-draft/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '' },
+            body: JSON.stringify({ template_type: templateType, additional_notes: notes }),
+        });
+        const data = await res.json();
+        if (data.ok && data.text) {
+            output = data.text;
+        }
+    } catch (e) { /* fallback */ }
+
+    if (!output) {
+        output = _templateDraft(templateType, notes);
+    }
+
+    document.getElementById('docText').textContent      = output;
+    document.getElementById('docLoading').style.display = 'none';
+    document.getElementById('docOutput').style.display  = 'block';
+    window._generatedDoc = output;
+    window._docType = templateType;
+    document.getElementById('generateBtn').disabled = false;
+}
+
+function copyDocument(btn) {
+    navigator.clipboard.writeText(window._generatedDoc || '').then(() => {
+        if (btn) {
+            btn.innerHTML = '<i class="bi bi-check me-1"></i>Copied!';
+            setTimeout(() => btn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy', 2000);
+        }
+    });
+}
+
+function downloadDocument() {
+    const blob = new Blob([window._generatedDoc || ''], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${CASE_DATA.case_number.replace(/\//g,'_')}_${window._docType || 'document'}.txt`;
+    a.click();
+}
+
+async function saveAsUpdate(btn) {
+    if (!window._generatedDoc) return;
+    btn.disabled = true; btn.textContent = 'Saving...';
+    try {
+        const res = await fetch(`/cases/${CASE_PK}/ai-summary/save/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+            body: JSON.stringify({
+                summary: window._generatedDoc,
+                title: `Document Draft: ${document.querySelector('[name="template_type"] option:checked').text}`
+            })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            btn.innerHTML = '<i class="bi bi-check me-1"></i>Saved!';
+            btn.style.background = '#059669';
+        } else {
+            btn.disabled = false; btn.textContent = 'Save to Case';
+            alert(data.error);
+        }
+    } catch(e) {
+        btn.disabled = false; btn.textContent = 'Save to Case';
+    }
+}
+
+function getCsrfToken() {
+    const m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+}
+</script>
+{% endblock %}

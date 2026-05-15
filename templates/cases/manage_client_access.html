@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block title %}Client Access{% endblock %}
+{% block page_title %}Manage Client Access{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-lg-8">
+
+  <div class="card mb-4">
+    <div class="card-body p-3 d-flex align-items-center gap-3">
+      <div class="flex-grow-1">
+        <div class="fw-semibold" style="font-size:15px">{{ case.title }}</div>
+        <div class="text-muted" style="font-size:13px">{{ case.case_number }} · {{ case.court_name }}</div>
+      </div>
+      <a href="{% url 'case_detail' case.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back</a>
+    </div>
+  </div>
+
+  <!-- Current access list -->
+  <div class="card mb-4">
+    <div class="card-header d-flex align-items-center gap-2">
+      <i class="bi bi-people text-primary"></i>Clients with access
+      <span class="badge bg-secondary ms-1" style="font-size:10px">{{ grants.count }}</span>
+    </div>
+    <div class="card-body p-0">
+      {% if grants %}
+      {% for g in grants %}
+      <div class="d-flex align-items-center gap-3 px-4 py-3 border-bottom">
+        <div style="width:34px;height:34px;background:#0f1b35;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#c9a84c;font-weight:700;font-size:13px;flex-shrink:0">
+          {{ g.client.get_full_name|default:g.client.username|slice:":1"|upper }}
+        </div>
+        <div class="flex-grow-1">
+          <div class="fw-semibold" style="font-size:14px">{{ g.client.get_full_name|default:g.client.username }}</div>
+          <div class="text-muted" style="font-size:12px">{{ g.client.email }} · Added {{ g.added_at|date:"d M Y" }}</div>
+          <div class="mt-1 d-flex gap-2">
+            {% if g.can_view_updates %}<span class="badge badge-disposed" style="font-size:10px">Updates ✓</span>{% endif %}
+            {% if g.can_view_documents %}<span class="badge badge-inprogress" style="font-size:10px">Documents ✓</span>{% endif %}
+          </div>
+        </div>
+        <form method="post" onsubmit="return confirm('Revoke access for {{ g.client.get_full_name|default:g.client.username }}?')">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="revoke">
+          <input type="hidden" name="grant_id" value="{{ g.pk }}">
+          <button class="btn btn-sm btn-outline-danger" style="font-size:12px"><i class="bi bi-person-dash me-1"></i>Revoke</button>
+        </form>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="text-center py-4 text-muted" style="font-size:13px">No clients have access to this case yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Grant access form -->
+  <div class="card">
+    <div class="card-header d-flex align-items-center gap-2">
+      <i class="bi bi-person-plus text-success"></i>Grant access to a client
+    </div>
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="grant">
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:13px">Client User <span class="text-danger">*</span></label>
+          {{ form.client }}
+          <div class="form-text">Only users with the <strong>Client</strong> role appear here. Create them in <a href="{% url 'user_create' %}">Users → Add User</a>.</div>
+        </div>
+        <div class="mb-3 d-flex gap-4">
+          <div class="form-check">{{ form.can_view_updates }}<label class="form-check-label ms-1" style="font-size:13px">Can view case updates</label></div>
+          <div class="form-check">{{ form.can_view_documents }}<label class="form-check-label ms-1" style="font-size:13px">Can view documents</label></div>
+        </div>
+        <div class="alert alert-info" style="font-size:12px">
+          <i class="bi bi-envelope me-1"></i>The client will receive an email with their portal login link when access is granted.
+        </div>
+        <button type="submit" class="btn btn-navy">
+          <i class="bi bi-person-check me-1"></i>Grant Access
+        </button>
+      </form>
+    </div>
+  </div>
+
+</div>
+</div>
+{% endblock %}

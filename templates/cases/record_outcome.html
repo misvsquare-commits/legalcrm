@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block title %}Record Outcome{% endblock %}
+{% block page_title %}Record Case Outcome{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-lg-7">
+
+  {% if existing %}
+  <div class="alert alert-warning mb-4">
+    <i class="bi bi-pencil-square me-2"></i>
+    This case already has an outcome recorded: <strong>{{ existing.get_result_display }}</strong> on {{ existing.disposed_date|date:"d M Y" }}. You are editing it.
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card-header d-flex align-items-center gap-2">
+      <i class="bi bi-journal-check text-success"></i>
+      Record Outcome — <span style="font-family:'Playfair Display',serif">{{ case.case_number }}</span>
+    </div>
+    <div class="card-body p-4">
+
+      <div class="mb-4 p-3 rounded" style="background:#f9fafb;border:1px solid #e5e7eb">
+        <div class="fw-semibold" style="font-size:15px;color:#0f1b35">{{ case.title }}</div>
+        <div class="text-muted mt-1" style="font-size:13px">
+          <i class="bi bi-building me-1"></i>{{ case.court_name }}
+          &nbsp;·&nbsp;<i class="bi bi-hash me-1"></i>{{ case.case_number }}
+          {% if case.assigned_to %}&nbsp;·&nbsp;<i class="bi bi-person me-1"></i>{{ case.assigned_to.get_full_name|default:case.assigned_to.username }}{% endif %}
+        </div>
+      </div>
+
+      <form method="post">
+        {% csrf_token %}
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold" style="font-size:13px">Result <span class="text-danger">*</span></label>
+            {{ form.result }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold" style="font-size:13px">Disposed Date <span class="text-danger">*</span></label>
+            {{ form.disposed_date }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold" style="font-size:13px">Judge / Bench</label>
+            {{ form.judge_name }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold" style="font-size:13px">Opposing Counsel</label>
+            {{ form.opposing_counsel }}
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold" style="font-size:13px">Summary</label>
+            {{ form.summary }}
+            <div class="form-text">Key points from the judgment, settlement terms, or reason for withdrawal.</div>
+          </div>
+        </div>
+
+        <div class="alert alert-info mt-4 mb-0" style="font-size:13px">
+          <i class="bi bi-info-circle me-1"></i>
+          Saving this will automatically set the case status to <strong>Disposed</strong> and notify the director.
+        </div>
+
+        <div class="d-flex gap-3 mt-4">
+          <button type="submit" class="btn btn-navy px-4">
+            <i class="bi bi-check-lg me-1"></i>Save Outcome
+          </button>
+          <a href="{% url 'case_detail' case.pk %}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+</div>
+{% endblock %}

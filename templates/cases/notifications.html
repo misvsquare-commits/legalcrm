@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block title %}Notifications{% endblock %}
+{% block page_title %}Notifications{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-lg-8">
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <p class="text-muted mb-0" style="font-size:14px">{{ notifications.count }} notification{{ notifications.count|pluralize }}</p>
+    <form method="post" action="{% url 'mark_all_notifs_read' %}" class="d-inline">
+        {% csrf_token %}
+        <button class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-check2-all me-1"></i>Mark all read
+        </button>
+    </form>
+</div>
+
+<div class="card">
+{% for n in notifications %}
+<div class="d-flex gap-3 px-4 py-3 border-bottom {% if not n.is_read %}notif-unread-row{% endif %}">
+    <div class="pt-1 flex-shrink-0">
+        {% if n.notif_type == 'hearing' %}<span class="notif-circle" style="background:#dc2626"></span>
+        {% elif n.notif_type == 'deadline' %}<span class="notif-circle" style="background:#d97706"></span>
+        {% elif n.notif_type == 'task' %}<span class="notif-circle" style="background:#2563eb"></span>
+        {% elif n.notif_type == 'overdue' %}<span class="notif-circle" style="background:#7c3aed"></span>
+        {% elif n.notif_type == 'update' %}<span class="notif-circle" style="background:#059669"></span>
+        {% else %}<span class="notif-circle" style="background:#9ca3af"></span>{% endif %}
+    </div>
+    <div class="flex-grow-1">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                {% if n.link %}
+                <a href="{{ n.link }}" class="fw-semibold text-decoration-none" style="font-size:14px;color:#0f1b35">{{ n.title }}</a>
+                {% else %}
+                <span class="fw-semibold" style="font-size:14px">{{ n.title }}</span>
+                {% endif %}
+                {% if not n.is_read %}<span class="badge ms-2" style="background:#dbeafe;color:#1e40af;font-size:9px">NEW</span>{% endif %}
+            </div>
+            <span class="text-muted flex-shrink-0 ms-3" style="font-size:11px">{{ n.created_at|date:"d M, H:i" }}</span>
+        </div>
+        {% if n.message %}<p class="text-muted mb-0 mt-1" style="font-size:13px">{{ n.message }}</p>{% endif %}
+        {% if n.case %}<a href="{% url 'case_detail' n.case.pk %}" class="text-muted" style="font-size:11px"><i class="bi bi-briefcase me-1"></i>{{ n.case.case_number }}</a>{% endif %}
+    </div>
+</div>
+{% empty %}
+<div class="text-center py-5">
+    <i class="bi bi-bell-slash text-muted" style="font-size:40px;display:block;margin-bottom:12px;opacity:.4"></i>
+    <p class="text-muted mb-0" style="font-size:14px">No notifications yet</p>
+</div>
+{% endfor %}
+</div>
+
+</div>
+</div>
+
+<style>
+.notif-circle { display:inline-block; width:10px; height:10px; border-radius:50%; }
+.notif-unread-row { background:#fffbeb; }
+.notif-unread-row:hover { background:#fef9c3; }
+</style>
+{% endblock %}

@@ -1,0 +1,342 @@
+{% extends 'base.html' %}
+{% block title %}Analytics{% endblock %}
+{% block page_title %}Director Analytics{% endblock %}
+
+{% block content %}
+
+<!-- ── Filter bar ─────────────────────────────────────────────── -->
+<div class="card mb-4">
+  <div class="card-body py-3">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label mb-1" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#6b7280">From</label>
+        {{ filter_form.from_date }}
+      </div>
+      <div class="col-auto">
+        <label class="form-label mb-1" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#6b7280">To</label>
+        {{ filter_form.to_date }}
+      </div>
+      <div class="col-auto">
+        <label class="form-label mb-1" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#6b7280">Lawyer</label>
+        {{ filter_form.lawyer }}
+      </div>
+      <div class="col-auto">
+        <label class="form-label mb-1" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#6b7280">Case Type</label>
+        {{ filter_form.case_type }}
+      </div>
+      <div class="col-auto d-flex gap-2">
+        <button class="btn btn-navy btn-sm" type="submit"><i class="bi bi-funnel-fill me-1"></i>Apply</button>
+        <a href="{% url 'analytics_dashboard' %}" class="btn btn-outline-secondary btn-sm">Reset</a>
+        <a href="{% url 'export_billing_csv' %}?from={{ from_date }}&to={{ to_date }}" class="btn btn-sm btn-outline-success">
+          <i class="bi bi-download me-1"></i>Billing CSV
+        </a>
+      </div>
+      <div class="col-auto ms-auto">
+        <span class="text-muted" style="font-size:12px">
+          {{ from_date|date:"d M Y" }} → {{ to_date|date:"d M Y" }}
+        </span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Top KPI cards ──────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    <div class="stat-card stat-navy">
+      <div class="d-flex justify-content-between align-items-start">
+        <div><div class="stat-number">{{ total_outcomes }}</div><div class="stat-label">Cases Closed</div></div>
+        <div class="stat-icon"><i class="bi bi-check2-all"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="stat-card stat-green">
+      <div class="d-flex justify-content-between align-items-start">
+        <div><div class="stat-number">{{ win_rate }}%</div><div class="stat-label">Win Rate</div></div>
+        <div class="stat-icon"><i class="bi bi-trophy-fill"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="stat-card stat-gold">
+      <div class="d-flex justify-content-between align-items-start">
+        <div><div class="stat-number">{{ settlement_rate }}%</div><div class="stat-label">Settlement Rate</div></div>
+        <div class="stat-icon"><i class="bi bi-handshake-fill"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="stat-card stat-orange">
+      <div class="d-flex justify-content-between align-items-start">
+        <div><div class="stat-number">{{ total_hours|floatformat:1 }}h</div><div class="stat-label">Total Hours Logged</div></div>
+        <div class="stat-icon"><i class="bi bi-clock-fill"></i></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Charts row ─────────────────────────────────────────────── -->
+<div class="row g-4 mb-4">
+
+  <!-- Outcome donut -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-pie-chart text-primary"></i>Outcome Breakdown
+      </div>
+      <div class="card-body d-flex align-items-center justify-content-center" style="min-height:220px">
+        {% if total_outcomes %}
+        <canvas id="outcomeChart" style="max-height:200px"></canvas>
+        {% else %}
+        <div class="text-center text-muted"><i class="bi bi-pie-chart" style="font-size:40px;opacity:.3;display:block;margin-bottom:10px"></i>No outcomes recorded yet</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Monthly filings bar -->
+  <div class="col-md-8">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-bar-chart text-warning"></i>Monthly Case Filings
+      </div>
+      <div class="card-body" style="min-height:220px">
+        {% if monthly_filings %}
+        <canvas id="filingChart"></canvas>
+        {% else %}
+        <div class="d-flex align-items-center justify-content-center h-100 text-muted">No data for selected period</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Lawyer Performance + Court Performance ─────────────────── -->
+<div class="row g-4 mb-4">
+
+  <!-- Lawyer win rates -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-person-check text-success"></i>Lawyer Performance
+      </div>
+      <div class="table-responsive">
+        <table class="table mb-0">
+          <thead>
+            <tr>
+              <th>Lawyer</th>
+              <th class="text-center">Cases</th>
+              <th class="text-center">Won</th>
+              <th class="text-center">Lost</th>
+              <th class="text-center">Settled</th>
+              <th style="min-width:120px">Win Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for s in lawyer_stats %}
+          <tr>
+            <td>
+              <div class="fw-semibold" style="font-size:13px">{{ s.lawyer.get_full_name|default:s.lawyer.username }}</div>
+            </td>
+            <td class="text-center"><span class="fw-semibold">{{ s.total }}</span></td>
+            <td class="text-center"><span class="badge badge-outcome-won">{{ s.won }}</span></td>
+            <td class="text-center"><span class="badge badge-outcome-lost">{{ s.lost }}</span></td>
+            <td class="text-center"><span class="badge badge-outcome-settled">{{ s.settled }}</span></td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <div class="win-bar-wrap flex-grow-1">
+                  <div class="win-bar-fill" style="width:{{ s.win_rate }}%"></div>
+                </div>
+                <span style="font-size:12px;font-weight:600;min-width:36px">{{ s.win_rate }}%</span>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-center py-4 text-muted" style="font-size:13px">No closed cases in this period</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Court win rates -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-building text-secondary"></i>Performance by Court
+      </div>
+      <div class="table-responsive">
+        <table class="table mb-0">
+          <thead>
+            <tr>
+              <th>Court</th>
+              <th class="text-center">Cases</th>
+              <th class="text-center">Won</th>
+              <th style="min-width:120px">Win Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for s in court_stats %}
+          <tr>
+            <td style="font-size:13px">{{ s.court|truncatechars:30 }}</td>
+            <td class="text-center"><span class="fw-semibold">{{ s.total }}</span></td>
+            <td class="text-center"><span class="badge badge-outcome-won">{{ s.won }}</span></td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <div class="win-bar-wrap flex-grow-1">
+                  <div class="win-bar-fill" style="width:{{ s.win_rate }}%"></div>
+                </div>
+                <span style="font-size:12px;font-weight:600;min-width:36px">{{ s.win_rate }}%</span>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-center py-4 text-muted" style="font-size:13px">No data</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Case Age + Time log + Recent outcomes ──────────────────── -->
+<div class="row g-4">
+
+  <!-- Case age buckets -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-hourglass-split text-warning"></i>Open Case Age
+      </div>
+      <div class="card-body">
+        {% with total_open=age_buckets.under_30|add:age_buckets.30_to_90|add:age_buckets.90_to_180|add:age_buckets.over_180 %}
+        <div class="age-row"><span>Under 30 days</span><span class="badge badge-outcome-won">{{ age_buckets.under_30 }}</span></div>
+        <div class="age-row"><span>30 – 90 days</span><span class="badge badge-dl-medium">{{ age_buckets.30_to_90 }}</span></div>
+        <div class="age-row"><span>90 – 180 days</span><span class="badge badge-dl-high">{{ age_buckets.90_to_180 }}</span></div>
+        <div class="age-row"><span class="fw-semibold text-danger">Over 180 days</span><span class="badge badge-dl-critical">{{ age_buckets.over_180 }}</span></div>
+        {% endwith %}
+        <hr style="border-color:#f3f4f6">
+        <canvas id="ageChart" style="max-height:160px"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Time by lawyer -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-clock text-secondary"></i>Time Logged
+        </div>
+        <span class="text-muted" style="font-size:11px">{{ billable_hours|floatformat:1 }}h billable</span>
+      </div>
+      <div class="card-body p-0">
+        {% for t in time_by_lawyer %}
+        <div class="d-flex align-items-center gap-3 px-3 py-2 border-bottom">
+          <div class="flex-grow-1">
+            <div class="fw-semibold" style="font-size:13px">
+              {% if t.user__first_name %}{{ t.user__first_name }} {{ t.user__last_name }}{% else %}{{ t.user__username }}{% endif %}
+            </div>
+          </div>
+          <div class="text-end">
+            <div class="fw-semibold" style="font-size:13px">{{ t.hours|floatformat:1 }}h</div>
+            <div class="text-muted" style="font-size:11px">{{ t.billable|default:0|floatformat:1 }}h billable</div>
+          </div>
+        </div>
+        {% empty %}
+        <div class="text-center py-5 text-muted" style="font-size:13px">No time logged in this period</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent closed cases -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-journal-check text-info"></i>Recent Outcomes
+      </div>
+      <div class="card-body p-0" style="max-height:340px;overflow-y:auto">
+        {% for o in recent_outcomes %}
+        <div class="d-flex align-items-start gap-3 px-3 py-2 border-bottom">
+          <div class="flex-grow-1">
+            <a href="{% url 'case_detail' o.case.pk %}" class="fw-semibold text-decoration-none" style="font-size:13px;color:#0f1b35">{{ o.case.title|truncatechars:28 }}</a>
+            <div class="text-muted" style="font-size:11px">{{ o.case.case_number }} · {{ o.disposed_date|date:"d M Y" }}</div>
+          </div>
+          <span class="badge {{ o.result_badge }} flex-shrink-0" style="font-size:10px">{{ o.get_result_display }}</span>
+        </div>
+        {% empty %}
+        <div class="text-center py-5 text-muted" style="font-size:13px">No outcomes recorded yet<br><a href="{% url 'case_list' %}" class="text-muted">Go to cases →</a></div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<style>
+.age-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f3f4f6; font-size:13px; }
+.age-row:last-child { border-bottom:none; }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Outcome donut ─────────────────────────────────────────────
+{% if total_outcomes %}
+const outData = {{ outcomes_by_result|safe }};
+const outColors = { won:'#059669', lost:'#dc2626', settled:'#2563eb',
+                    withdrawn:'#d97706', dismissed:'#6b7280', other:'#9ca3af', transferred:'#7c3aed' };
+new Chart(document.getElementById('outcomeChart').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+        labels: outData.map(d => d.result.charAt(0).toUpperCase() + d.result.slice(1)),
+        datasets: [{ data: outData.map(d => d.count),
+            backgroundColor: outData.map(d => outColors[d.result] || '#9ca3af'),
+            borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: { responsive:true, cutout:'65%',
+        plugins:{ legend:{ position:'bottom', labels:{ font:{family:'DM Sans',size:11}, padding:8, boxWidth:10 } } }
+    }
+});
+{% endif %}
+
+// ── Monthly filings bar ───────────────────────────────────────
+{% if monthly_filings %}
+const filingData = {{ monthly_filings|safe }};
+new Chart(document.getElementById('filingChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: filingData.map(d => d.month_label),
+        datasets: [{ label:'Cases filed', data: filingData.map(d => d.count),
+            backgroundColor:'rgba(15,27,53,0.78)', borderRadius:4, borderSkipped:false }]
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false} },
+        scales: {
+            y:{ beginAtZero:true, ticks:{stepSize:1, font:{family:'DM Sans',size:10}}, grid:{color:'rgba(0,0,0,0.04)'} },
+            x:{ ticks:{font:{family:'DM Sans',size:10}}, grid:{display:false} }
+        }
+    }
+});
+{% endif %}
+
+// ── Age doughnut ──────────────────────────────────────────────
+new Chart(document.getElementById('ageChart').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Under 30d','30–90d','90–180d','Over 180d'],
+        datasets: [{ data: [{{ age_buckets.under_30 }},{{ age_buckets.30_to_90 }},{{ age_buckets.90_to_180 }},{{ age_buckets.over_180 }}],
+            backgroundColor:['#059669','#c9a84c','#d97706','#dc2626'],
+            borderWidth:2, borderColor:'#fff' }]
+    },
+    options: { responsive:true, cutout:'60%',
+        plugins:{ legend:{ position:'bottom', labels:{ font:{family:'DM Sans',size:10}, padding:6, boxWidth:9 } } }
+    }
+});
+</script>
+{% endblock %}

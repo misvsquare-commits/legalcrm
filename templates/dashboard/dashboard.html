@@ -1,0 +1,458 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-page">
+
+<!-- ── Stat Cards ─────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="stat-card stat-navy h-100">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-number">{{ total_cases }}</div><div class="stat-label">Total Cases</div></div>
+                <div class="stat-icon"><i class="bi bi-briefcase-fill"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="stat-card stat-gold h-100">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-number">{{ inprogress_cases }}</div><div class="stat-label">In Progress</div></div>
+                <div class="stat-icon"><i class="bi bi-hourglass-split"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="stat-card stat-green h-100">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-number">{{ disposed_cases }}</div><div class="stat-label">Disposed</div></div>
+                <div class="stat-icon"><i class="bi bi-check-circle-fill"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="stat-card stat-orange h-100">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-number">{{ on_hold_cases }}</div><div class="stat-label">On Hold</div></div>
+                <div class="stat-icon"><i class="bi bi-pause-circle-fill"></i></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-bell me-1 text-danger"></i>Alert Jobs</span>
+                <span class="text-muted" style="font-size:11px">Daily + Manual</span>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3" style="font-size:12px">
+                    No command line needed. Daily reminders run automatically once per day.
+                    Click below anytime to send reminders immediately.
+                </p>
+                <form method="post" action="{% url 'run_alerts_now' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn" style="background:#166534;color:white"
+                            onclick="return confirm('Send reminders now for due hearings?')">
+                        <i class="bi bi-lightning-charge-fill me-1"></i>Send Reminders Now
+                    </button>
+                </form>
+                <div class="form-text mt-2">For admin/lawyer users.</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-envelope-at me-1 text-primary"></i>Global Alert Emails (All Cases)
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'manage_global_recipients' %}" class="mb-3">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="add_bulk">
+                    <label class="form-label fw-semibold" style="font-size:12px">Add Emails in Bulk</label>
+                    <textarea name="bulk_emails" rows="3" class="form-control"
+                              placeholder="one@firm.com, two@firm.com&#10;three@firm.com"></textarea>
+                    <div class="form-text">These emails receive hearing alerts for every case.</div>
+                    <button type="submit" class="btn btn-sm btn-outline-primary mt-2">
+                        <i class="bi bi-person-plus me-1"></i>Add Bulk Emails
+                    </button>
+                </form>
+                {% if global_recipients %}
+                <div class="border rounded" style="max-height:140px;overflow:auto">
+                    {% for r in global_recipients %}
+                    <div class="d-flex justify-content-between align-items-center px-3 py-2 {% if not forloop.last %}border-bottom{% endif %}">
+                        <div>
+                            <div style="font-size:13px" class="fw-semibold">{{ r.email }}</div>
+                            {% if r.name %}<div class="text-muted" style="font-size:11px">{{ r.name }}</div>{% endif %}
+                        </div>
+                        <form method="post" action="{% url 'manage_global_recipients' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="remove">
+                            <input type="hidden" name="recipient_id" value="{{ r.pk }}">
+                            <button class="btn btn-sm btn-outline-danger" style="font-size:11px;padding:2px 8px">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-muted" style="font-size:12px">No global alert emails yet.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Charts ─────────────────────────────────────────────────── -->
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header d-flex align-items-center gap-2">
+                <i class="bi bi-pie-chart text-warning"></i>Cases by Status
+            </div>
+            <div class="card-body d-flex align-items-center justify-content-center" style="min-height:200px">
+                <canvas id="statusChart" style="max-height:190px"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card h-100">
+            <div class="card-header d-flex align-items-center gap-2">
+                <i class="bi bi-bar-chart text-primary"></i>Cases by Court
+            </div>
+            <div class="card-body" style="min-height:200px">
+                <canvas id="courtChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Upcoming Hearings + Recent Cases ──────────────────────── -->
+<div class="row g-4">
+
+    <!-- UPCOMING HEARINGS — next 30 days -->
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-calendar-event text-danger"></i>
+                    <span>Upcoming Hearings</span>
+                    {% if upcoming_hearings %}<span class="badge bg-danger rounded-pill" style="font-size:10px">{{ upcoming_hearings.count }}</span>{% endif %}
+                </div>
+                <span class="text-muted" style="font-size:11px">Next 30 days</span>
+            </div>
+            <div class="card-body p-0" style="max-height:500px;overflow-y:auto">
+                {% if upcoming_hearings %}
+                {% for case in upcoming_hearings %}
+                <div class="hearing-item px-3 py-2">
+                    <div class="d-flex align-items-start gap-2">
+                        <!-- urgency dot -->
+                        <div class="pt-1 flex-shrink-0">
+                            {% if case.days_to_hearing == 0 %}
+                                <span class="hdot hdot-today"></span>
+                            {% elif case.days_to_hearing <= 3 %}
+                                <span class="hdot hdot-soon"></span>
+                            {% elif case.days_to_hearing <= 7 %}
+                                <span class="hdot hdot-week"></span>
+                            {% else %}
+                                <span class="hdot hdot-month"></span>
+                            {% endif %}
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="me-2">
+                                    <div class="fw-semibold" style="font-size:13px;color:#0f1b35;line-height:1.3">{{ case.title|truncatechars:40 }}</div>
+                                    <div class="text-muted" style="font-size:11px;margin-top:2px">
+                                        <i class="bi bi-hash"></i>{{ case.case_number }}
+                                        &nbsp;·&nbsp;<i class="bi bi-building"></i>&nbsp;{{ case.court_name|truncatechars:20 }}
+                                    </div>
+                                    {% if case.assigned_to %}
+                                    <div class="text-muted" style="font-size:11px">
+                                        <i class="bi bi-person"></i>&nbsp;{{ case.assigned_to.get_full_name|default:case.assigned_to.username }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="text-end flex-shrink-0">
+                                    <div class="fw-bold" style="font-size:13px;color:#b8860b">{{ case.next_hearing_date|date:"d M" }}</div>
+                                    {% if case.days_to_hearing == 0 %}
+                                        <span class="badge bg-danger" style="font-size:9px">TODAY</span>
+                                    {% elif case.days_to_hearing == 1 %}
+                                        <span class="badge bg-warning text-dark" style="font-size:9px">TOMORROW</span>
+                                    {% elif case.days_to_hearing <= 7 %}
+                                        <span class="badge bg-warning text-dark" style="font-size:9px">{{ case.days_to_hearing }}d</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary" style="font-size:9px">{{ case.days_to_hearing }}d</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <!-- Calendar action buttons -->
+                            <div class="d-flex gap-2 mt-2 flex-wrap">
+                                <a href="{% url 'case_detail' case.pk %}" class="btn btn-sm btn-outline-secondary" style="font-size:11px;padding:2px 9px">
+                                    <i class="bi bi-eye me-1"></i>View
+                                </a>
+                                <a href="{% url 'export_hearing_ics' case.pk %}" class="btn btn-sm" style="font-size:11px;padding:2px 9px;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0" title="Download .ics">
+                                    <i class="bi bi-calendar-plus me-1"></i>.ics
+                                </a>
+                                <a href="https://calendar.google.com/calendar/render?action=TEMPLATE&text={{ case.title|urlencode }}+Hearing&dates={{ case.next_hearing_date|date:'Ymd' }}/{{ case.next_hearing_date|date:'Ymd' }}&details=Case:+{{ case.case_number|urlencode }}&location={{ case.court_name|urlencode }}"
+                                   target="_blank" rel="noopener"
+                                   class="btn btn-sm" style="font-size:11px;padding:2px 9px;background:#fff0f0;color:#c0392b;border:1px solid #fecaca" title="Add to Google Calendar">
+                                    <i class="bi bi-google me-1"></i>GCal
+                                </a>
+                                <!-- Sync to emails button -->
+                                <button type="button"
+                                        class="btn btn-sm"
+                                        style="font-size:11px;padding:2px 9px;background:#f5f3ff;color:#5b21b6;border:1px solid #ddd6fe"
+                                        onclick="openSyncModal({{ case.pk }}, '{{ case.title|escapejs }}', '{{ case.next_hearing_date|date:'d M Y' }}')"
+                                        title="Sync to email calendars">
+                                    <i class="bi bi-envelope-plus me-1"></i>Sync
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% if not forloop.last %}<hr class="mx-3 my-0" style="border-color:#f3f4f6;margin:0">{% endif %}
+                {% endfor %}
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-calendar-check text-muted" style="font-size:38px;display:block;margin-bottom:10px;opacity:0.35"></i>
+                    <p class="fw-semibold text-muted mb-1" style="font-size:14px">No upcoming hearings</p>
+                    <p class="text-muted" style="font-size:12px">Next 30 days are clear</p>
+                </div>
+                {% endif %}
+            </div>
+            {% if upcoming_hearings %}
+            <div class="card-footer bg-white py-2 px-3" style="border-radius:0 0 12px 12px;border-top:1px solid #f3f4f6">
+                <span class="text-muted" style="font-size:11px"><i class="bi bi-info-circle me-1"></i>.ics works with Google, Apple & Outlook calendars</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- NEW CASES — today -->
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-clock-history text-secondary"></i>
+                    New Cases Today
+                    <span class="badge bg-secondary rounded-pill" style="font-size:10px">{{ new_cases_count }}</span>
+                </div>
+                <a href="{% url 'case_list' %}" class="btn btn-sm btn-outline-secondary" style="font-size:11px">View All</a>
+            </div>
+            <div class="card-body p-0">
+                {% if recent_cases %}
+                <div class="table-responsive">
+                    <table class="table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Case</th>
+                                <th class="d-none d-md-table-cell">Court</th>
+                                <th>Status</th>
+                                <th>Filed</th>  <!-- Change 6: date column -->
+                                <th class="d-none d-lg-table-cell">Lawyer</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for case in recent_cases %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'case_detail' case.pk %}" class="text-decoration-none fw-semibold text-dark" style="font-size:13px">{{ case.title|truncatechars:26 }}</a>
+                                    <div class="text-muted" style="font-size:11px">{{ case.case_number }}</div>
+                                </td>
+                                <td class="d-none d-md-table-cell" style="font-size:12px">{{ case.court_name|truncatechars:16 }}</td>
+                                <td>
+                                    <span class="badge {{ case.status_badge_class }}" style="font-size:10px;padding:3px 7px">
+                                        {{ case.get_status_display }}
+                                    </span>
+                                </td>
+                                <!-- Change 6: filing date + created date -->
+                                <td>
+                                    <div style="font-size:12px;color:#374151">{{ case.filing_date|date:"d M Y" }}</div>
+                                    <div class="text-muted" style="font-size:10px">Added {{ case.created_at|date:"d M" }}</div>
+                                </td>
+                                <td class="d-none d-lg-table-cell" style="font-size:12px">
+                                    {{ case.assigned_to.get_full_name|default:case.assigned_to.username|default:"—"|truncatechars:14 }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-briefcase text-muted" style="font-size:36px;display:block;margin-bottom:10px;opacity:0.35"></i>
+                    <p class="text-muted mb-2" style="font-size:14px">No new cases</p>
+                    <p class="text-muted mb-0" style="font-size:12px">No case has been added today.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ══ SYNC TO CALENDAR MODAL ══════════════════════════════════ -->
+<div class="modal fade" id="syncCalendarModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:460px">
+        <div class="modal-content">
+            <div class="modal-header" style="border-bottom:1px solid #f3f4f6">
+                <div>
+                    <h5 class="modal-title mb-0" style="font-family:'Playfair Display',serif;font-size:18px">Sync to Calendar</h5>
+                    <p class="text-muted mb-0" id="syncModalSubtitle" style="font-size:12px"></p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label fw-semibold" style="font-size:13px">
+                    <i class="bi bi-envelope me-1"></i>Email Addresses
+                </label>
+                <textarea id="syncEmailInput" class="form-control" rows="3"
+                    placeholder="Enter email addresses, one per line or comma-separated&#10;e.g.&#10;lawyer@firm.com&#10;client@example.com, judge@court.gov"
+                    style="font-size:13px;resize:none"></textarea>
+                <div class="form-text">Separate multiple emails with commas or new lines.</div>
+
+                <div id="syncResult" class="mt-3" style="display:none"></div>
+            </div>
+            <div class="modal-footer" style="border-top:1px solid #f3f4f6">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-sm" id="syncSubmitBtn"
+                    style="background:#5b21b6;color:white;border:none"
+                    onclick="submitCalendarSync()">
+                    <i class="bi bi-send me-1"></i>Generate Calendar Links
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Hearing urgency dots */
+.hdot { display:inline-block; width:10px; height:10px; border-radius:50%; }
+.hdot-today  { background:#dc2626; box-shadow:0 0 0 3px rgba(220,38,38,.2); }
+.hdot-soon   { background:#d97706; box-shadow:0 0 0 3px rgba(217,119,6,.2); }
+.hdot-week   { background:#059669; }
+.hdot-month  { background:#9ca3af; }
+.hearing-item { transition: background .15s; }
+.hearing-item:hover { background: #fafafa; }
+</style>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Charts ────────────────────────────────────────────────────
+new Chart(document.getElementById('statusChart').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+        labels: ['In Progress', 'Disposed', 'On Hold'],
+        datasets: [{ data: [{{ inprogress_cases }}, {{ disposed_cases }}, {{ on_hold_cases }}],
+            backgroundColor: ['#3b82f6','#059669','#dc2626'], borderWidth:2, borderColor:'#fff' }]
+    },
+    options: { responsive:true, cutout:'68%',
+        plugins:{ legend:{ position:'bottom', labels:{ font:{family:'DM Sans',size:11}, padding:10, boxWidth:11 } } }
+    }
+});
+
+const courtData = {{ cases_by_court|safe }};
+new Chart(document.getElementById('courtChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: courtData.map(d => d.court_name.length>20 ? d.court_name.substr(0,20)+'…' : d.court_name),
+        datasets:[{ label:'Cases', data:courtData.map(d=>d.count),
+            backgroundColor:'rgba(15,27,53,0.82)', borderRadius:5, borderSkipped:false }]
+    },
+    options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false} },
+        scales:{ y:{beginAtZero:true, ticks:{stepSize:1,font:{family:'DM Sans',size:10}}, grid:{color:'rgba(0,0,0,0.04)'}},
+                 x:{ticks:{font:{family:'DM Sans',size:10}}, grid:{display:false}} }
+    }
+});
+
+// ── Sync Calendar Modal ───────────────────────────────────────
+let _syncCasePk = null;
+function openSyncModal(pk, title, dateStr) {
+    _syncCasePk = pk;
+    document.getElementById('syncModalSubtitle').textContent = title + ' · ' + dateStr;
+    document.getElementById('syncEmailInput').value = '';
+    document.getElementById('syncResult').style.display = 'none';
+    new bootstrap.Modal(document.getElementById('syncCalendarModal')).show();
+}
+
+function submitCalendarSync() {
+    if (!_syncCasePk) return;
+    const raw = document.getElementById('syncEmailInput').value;
+    const emails = raw.split(/[\n,]+/).map(e=>e.trim()).filter(Boolean);
+    if (!emails.length) {
+        showSyncResult('error', 'Please enter at least one email address.');
+        return;
+    }
+    const btn = document.getElementById('syncSubmitBtn');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generating…';
+
+    fetch(`/cases/${_syncCasePk}/sync-calendar/`, {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+        body: JSON.stringify({ emails })
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false; btn.innerHTML = '<i class="bi bi-send me-1"></i>Generate Calendar Links';
+        if (data.ok) {
+            showSyncResult('success', data.message, data.ics_url, data.gcal_url, emails);
+        } else {
+            showSyncResult('error', data.error);
+        }
+    })
+    .catch(() => {
+        btn.disabled = false; btn.innerHTML = '<i class="bi bi-send me-1"></i>Generate Calendar Links';
+        showSyncResult('error', 'Network error. Please try again.');
+    });
+}
+
+function showSyncResult(type, msg, icsUrl, gcalUrl, emails) {
+    const box = document.getElementById('syncResult');
+    box.style.display = 'block';
+    if (type === 'error') {
+        box.innerHTML = `<div class="alert alert-danger py-2 mb-0" style="font-size:13px"><i class="bi bi-exclamation-circle me-1"></i>${msg}</div>`;
+        return;
+    }
+    const emailList = emails.map(e=>`<li style="font-size:12px">${e}</li>`).join('');
+    box.innerHTML = `
+        <div class="p-3 rounded" style="background:#f0fdf4;border:1px solid #bbf7d0">
+            <div class="fw-semibold mb-2" style="font-size:13px;color:#166534"><i class="bi bi-check-circle me-1"></i>${msg}</div>
+            <p class="mb-2" style="font-size:12px;color:#166534">Share these links with recipients:</p>
+            <ul class="mb-2 ps-3" style="color:#374151">${emailList}</ul>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="${icsUrl}" class="btn btn-sm" style="font-size:11px;background:#166534;color:white">
+                    <i class="bi bi-calendar-plus me-1"></i>Download .ics
+                </a>
+                <a href="${gcalUrl}" target="_blank" class="btn btn-sm" style="font-size:11px;background:#c0392b;color:white">
+                    <i class="bi bi-google me-1"></i>Open Google Calendar
+                </a>
+                <button onclick="copyToClipboard('${icsUrl}')" class="btn btn-sm btn-outline-secondary" style="font-size:11px">
+                    <i class="bi bi-clipboard me-1"></i>Copy .ics Link
+                </button>
+            </div>
+        </div>`;
+}
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = event.target.closest('button');
+        btn.innerHTML = '<i class="bi bi-check me-1"></i>Copied!';
+        setTimeout(() => btn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy .ics Link', 2000);
+    });
+}
+
+function getCookie(name) {
+    const m = document.cookie.match(new RegExp('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)'));
+    return m ? m.pop() : '';
+}
+</script>
+{% endblock %}

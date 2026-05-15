@@ -1,0 +1,219 @@
+{% extends 'base.html' %}
+{% block title %}Workload Dashboard{% endblock %}
+{% block page_title %}Workload Dashboard{% endblock %}
+
+{% block content %}
+
+<!-- ── Summary strip ───────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="stat-card stat-navy">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-number">{{ workload|length }}</div><div class="stat-label">Lawyers</div></div>
+                <div class="stat-icon"><i class="bi bi-people-fill"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card stat-gold">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-number">{{ all_hearings.count }}</div><div class="stat-label">Hearings (30d)</div></div>
+                <div class="stat-icon"><i class="bi bi-calendar-event"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card stat-orange">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-number">{{ overdue_deadlines|length }}</div><div class="stat-label">Overdue Deadlines</div></div>
+                <div class="stat-icon"><i class="bi bi-exclamation-triangle-fill"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card stat-green">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-number">{{ stale_cases|length }}</div><div class="stat-label">Stale Cases</div></div>
+                <div class="stat-icon"><i class="bi bi-clock-history"></i></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+
+<!-- ── Lawyer workload table ──────────────────────────────────── -->
+<div class="col-12">
+<div class="card">
+    <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-person-lines-fill text-primary"></i>
+        Lawyer Workload — Live Overview
+    </div>
+    <div class="table-responsive">
+    <table class="table mb-0">
+        <thead>
+            <tr>
+                <th>Lawyer</th>
+                <th class="text-center">Open Cases</th>
+                <th class="text-center">In Progress</th>
+                <th class="text-center">On Hold</th>
+                <th class="text-center">Hearings This Week</th>
+                <th class="text-center">Overdue Deadlines</th>
+                <th class="text-center">Pending Tasks</th>
+                <th class="text-center">Load</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for w in workload %}
+        <tr>
+            <td>
+                <div class="d-flex align-items-center gap-2">
+                    <div style="width:32px;height:32px;background:#0f1b35;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#c9a84c;font-weight:700;font-size:12px;flex-shrink:0">
+                        {{ w.lawyer.get_full_name|default:w.lawyer.username|slice:":1"|upper }}
+                    </div>
+                    <div>
+                        <div class="fw-semibold" style="font-size:13px">{{ w.lawyer.get_full_name|default:w.lawyer.username }}</div>
+                        <div class="text-muted" style="font-size:11px">{{ w.lawyer.get_role_display }}</div>
+                    </div>
+                </div>
+            </td>
+            <td class="text-center"><span class="fw-semibold" style="font-size:15px">{{ w.open_cases }}</span></td>
+            <td class="text-center"><span class="badge badge-inprogress">{{ w.inprogress }}</span></td>
+            <td class="text-center"><span class="badge badge-hold">{{ w.on_hold }}</span></td>
+            <td class="text-center">
+                {% if w.hearings_week > 0 %}
+                <span class="badge bg-warning text-dark">{{ w.hearings_week }}</span>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+            </td>
+            <td class="text-center">
+                {% if w.overdue_dl > 0 %}
+                <span class="badge badge-dl-critical">{{ w.overdue_dl }} overdue</span>
+                {% else %}<span class="text-muted" style="font-size:12px">✓ Clear</span>{% endif %}
+            </td>
+            <td class="text-center">
+                {% if w.pending_tasks > 0 %}
+                <span class="badge badge-dl-medium">{{ w.pending_tasks }}</span>
+                {% else %}<span class="text-muted" style="font-size:12px">—</span>{% endif %}
+            </td>
+            <td class="text-center" style="min-width:100px">
+                {% with total=w.open_cases %}
+                {% if total >= 10 %}
+                <div class="load-bar"><div class="load-fill load-high" style="width:100%"></div></div>
+                <span style="font-size:10px;color:#dc2626">Heavy</span>
+                {% elif total >= 5 %}
+                <div class="load-bar"><div class="load-fill load-medium" style="width:{{ total|floatformat:0 }}0%"></div></div>
+                <span style="font-size:10px;color:#d97706">Medium</span>
+                {% else %}
+                <div class="load-bar"><div class="load-fill load-low" style="width:{{ total|floatformat:0 }}0%"></div></div>
+                <span style="font-size:10px;color:#059669">Light</span>
+                {% endif %}
+                {% endwith %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="text-center py-4 text-muted">No lawyers found.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+</div>
+
+<!-- ── Upcoming hearings ────────────────────────────────────────── -->
+<div class="col-lg-6">
+<div class="card h-100">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-calendar-event text-danger"></i>All Upcoming Hearings
+        </div>
+        <span class="badge bg-danger rounded-pill" style="font-size:10px">{{ all_hearings.count }}</span>
+    </div>
+    <div class="card-body p-0" style="max-height:400px;overflow-y:auto">
+    {% for case in all_hearings %}
+    <div class="d-flex align-items-center gap-3 px-3 py-2 border-bottom" style="font-size:13px">
+        <div class="flex-shrink-0 text-center" style="width:44px">
+            <div class="fw-bold" style="font-size:16px;color:#b8860b;line-height:1">{{ case.next_hearing_date|date:"d" }}</div>
+            <div style="font-size:10px;color:#6b7280;text-transform:uppercase">{{ case.next_hearing_date|date:"M" }}</div>
+        </div>
+        <div class="flex-grow-1">
+            <a href="{% url 'case_detail' case.pk %}" class="fw-semibold text-decoration-none" style="color:#0f1b35;font-size:13px">{{ case.title|truncatechars:34 }}</a>
+            <div class="text-muted" style="font-size:11px">{{ case.court_name|truncatechars:30 }}</div>
+        </div>
+        <div class="flex-shrink-0 text-end">
+            {% if case.days_to_hearing == 0 %}
+            <span class="badge bg-danger" style="font-size:9px">TODAY</span>
+            {% elif case.days_to_hearing <= 3 %}
+            <span class="badge bg-warning text-dark" style="font-size:9px">{{ case.days_to_hearing }}d</span>
+            {% else %}
+            <span class="badge bg-secondary" style="font-size:9px">{{ case.days_to_hearing }}d</span>
+            {% endif %}
+            <div style="font-size:11px;color:#6b7280;margin-top:2px">{{ case.assigned_to.get_full_name|default:"—"|truncatechars:12 }}</div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="text-center py-5 text-muted" style="font-size:14px">No hearings in the next 30 days</div>
+    {% endfor %}
+    </div>
+</div>
+</div>
+
+<!-- ── Overdue deadlines + Stale cases ────────────────────────── -->
+<div class="col-lg-6">
+
+    <!-- Overdue deadlines -->
+    <div class="card mb-4">
+        <div class="card-header d-flex align-items-center gap-2">
+            <i class="bi bi-exclamation-triangle-fill text-danger"></i>Overdue Deadlines
+            {% if overdue_deadlines %}<span class="badge bg-danger rounded-pill" style="font-size:10px">{{ overdue_deadlines|length }}</span>{% endif %}
+        </div>
+        <div class="card-body p-0" style="max-height:200px;overflow-y:auto">
+        {% for dl in overdue_deadlines %}
+        <div class="d-flex align-items-center gap-3 px-3 py-2 border-bottom">
+            <div class="flex-grow-1">
+                <div class="fw-semibold" style="font-size:13px;color:#dc2626">{{ dl.title|truncatechars:36 }}</div>
+                <div class="text-muted" style="font-size:11px">
+                    <a href="{% url 'case_detail' dl.case.pk %}" class="text-decoration-none text-muted">{{ dl.case.case_number }}</a>
+                    &nbsp;·&nbsp;Due {{ dl.due_date|date:"d M Y" }}
+                    &nbsp;·&nbsp;{{ dl.case.assigned_to.get_full_name|default:"Unassigned"|truncatechars:16 }}
+                </div>
+            </div>
+            <span class="badge badge-dl-{{ dl.priority }}">{{ dl.get_priority_display }}</span>
+        </div>
+        {% empty %}
+        <div class="text-center py-4 text-muted" style="font-size:13px">✓ No overdue deadlines</div>
+        {% endfor %}
+        </div>
+    </div>
+
+    <!-- Stale cases -->
+    <div class="card">
+        <div class="card-header d-flex align-items-center gap-2">
+            <i class="bi bi-clock-history text-warning"></i>Stale Cases
+            <span class="text-muted" style="font-size:11px">(no update in 45+ days)</span>
+        </div>
+        <div class="card-body p-0" style="max-height:200px;overflow-y:auto">
+        {% for case in stale_cases %}
+        <div class="d-flex align-items-center gap-3 px-3 py-2 border-bottom">
+            <div class="flex-grow-1">
+                <a href="{% url 'case_detail' case.pk %}" class="fw-semibold text-decoration-none" style="color:#0f1b35;font-size:13px">{{ case.title|truncatechars:34 }}</a>
+                <div class="text-muted" style="font-size:11px">{{ case.case_number }} · Last updated {{ case.updated_at|date:"d M Y" }}</div>
+            </div>
+            <span class="text-muted" style="font-size:11px">{{ case.assigned_to.get_full_name|default:"—"|truncatechars:14 }}</span>
+        </div>
+        {% empty %}
+        <div class="text-center py-4 text-muted" style="font-size:13px">✓ All cases are active</div>
+        {% endfor %}
+        </div>
+    </div>
+</div>
+
+</div><!-- /row -->
+
+<style>
+.load-bar { height:5px; background:#f3f4f6; border-radius:3px; margin-bottom:2px; overflow:hidden; }
+.load-fill { height:100%; border-radius:3px; }
+.load-high   { background:#dc2626; }
+.load-medium { background:#d97706; }
+.load-low    { background:#059669; }
+</style>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}Delete Case{% endblock %}
+{% block page_title %}Delete Case{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white d-flex align-items-center gap-2">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                Confirm Deletion
+            </div>
+            <div class="card-body p-4 text-center">
+                <div style="font-size:52px;margin-bottom:16px">⚠️</div>
+                <h5 class="mb-2" style="font-family:'Playfair Display',serif">Delete this case?</h5>
+                <p class="text-muted mb-1" style="font-size:14px">
+                    You are about to permanently delete:
+                </p>
+                <div class="p-3 rounded mb-4" style="background:#fef2f2;border:1px solid #fecaca">
+                    <div class="fw-bold text-dark">{{ case.title }}</div>
+                    <div class="text-muted small">{{ case.case_number }} — {{ case.court_name }}</div>
+                </div>
+                <p class="text-danger small mb-4">
+                    <i class="bi bi-exclamation-circle me-1"></i>
+                    This will also delete all updates, documents, and comments.
+                    <strong>This action cannot be undone.</strong>
+                </p>
+
+                <div class="d-flex gap-3 justify-content-center">
+                    <a href="{% url 'case_detail' case.pk %}" class="btn btn-outline-secondary px-4">
+                        <i class="bi bi-arrow-left me-1"></i> Cancel
+                    </a>
+                    <form method="post">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger px-4">
+                            <i class="bi bi-trash me-1"></i> Yes, Delete
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

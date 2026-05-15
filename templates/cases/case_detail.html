@@ -1,0 +1,2121 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ case.case_number }}{% endblock %}
+{% block page_title %}Case Detail{% endblock %}
+
+{% block content %}
+
+<!-- ── Case Header ──────────────────────────────────────────── -->
+<div class="card mb-4">
+    <div class="card-body p-4">
+        <div class="row align-items-start">
+            <div class="col-lg-8">
+                <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+                    <span class="badge bg-light text-dark border fw-semibold" style="font-size:13px">
+                        {{ case.case_number }}
+                    </span>
+                    <span class="badge {{ case.status_badge_class }}" style="font-size:12px;padding:5px 12px">
+                        {{ case.get_status_display }}
+                    </span>
+                    <span class="badge bg-light text-secondary border" style="font-size:11px">
+                        {{ case.get_case_type_display }}
+                    </span>
+                    {% if case.project %}
+                    <span class="badge" style="background:#eff6ff;color:#1d4ed8;font-size:11px;padding:4px 10px">
+                        <i class="bi bi-folder me-1"></i>{{ case.project }}
+                    </span>
+                    {% endif %}
+                    {% if case.outcome %}
+                    <span class="badge {{ case.outcome.result_badge }}" style="font-size:12px;padding:5px 12px">
+                        <i class="bi bi-trophy me-1"></i>{{ case.outcome.get_result_display }}
+                    </span>
+                    {% endif %}
+                </div>
+
+                <h2 style="font-family:'Playfair Display',serif;font-size:26px;color:#0f1b35;margin-bottom:8px">
+                    {{ case.title }}
+                </h2>
+
+                {% if case.petitioner or case.respondent %}
+                <p class="text-muted mb-3" style="font-size:14px">
+                    <i class="bi bi-person me-1"></i>
+                    <strong>{{ case.petitioner|default:"—" }}</strong>
+                    <span class="mx-2 text-muted">vs</span>
+                    <strong>{{ case.respondent|default:"—" }}</strong>
+                </p>
+                {% endif %}
+
+                <div class="row g-3 mt-1">
+                    <div class="col-sm-6 col-md-3">
+                        <div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px">Court</div>
+                        <div style="font-size:14px;font-weight:500;color:#111">{{ case.court_name }}</div>
+                    </div>
+                    <div class="col-sm-6 col-md-3">
+                        <div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px">Filing Date</div>
+                        <div style="font-size:14px;font-weight:500;color:#111">{{ case.filing_date|date:"d M Y" }}</div>
+                    </div>
+                    <div class="col-sm-6 col-md-3">
+                        <div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px">Last Hearing</div>
+                        <div style="font-size:14px;font-weight:500;color:#111">
+                            {% if case.last_hearing_date %}{{ case.last_hearing_date|date:"d M Y" }}{% else %}<span class="text-muted">—</span>{% endif %}
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-md-3">
+                        <div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px">Next Hearing</div>
+                        <div style="font-size:14px;font-weight:500;color:#111">
+                            {% if case.next_hearing_date %}
+                                {{ case.next_hearing_date|date:"d M Y" }}
+                                {% if case.is_hearing_upcoming %}
+                                <span class="badge bg-warning text-dark ms-1" style="font-size:10px">
+                                    {% if case.days_to_hearing == 0 %}Today{% elif case.days_to_hearing == 1 %}Tomorrow{% else %}{{ case.days_to_hearing }}d{% endif %}
+                                </span>
+                                {% endif %}
+                            {% else %}—{% endif %}
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-md-3">
+                        <div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px">Assigned Lawyer</div>
+                        <div style="font-size:14px;font-weight:500;color:#111">
+                            {{ case.assigned_to.get_full_name|default:case.assigned_to.username|default:"Unassigned" }}
+                        </div>
+                    </div>
+                    {% if case.project %}
+                    <div class="col-sm-6 col-md-3">
+                        <div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px">Project</div>
+                        <div style="font-size:14px;font-weight:500;color:#1d4ed8">
+                            <i class="bi bi-folder me-1"></i>{{ case.project }}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+
+            </div>
+
+            <div class="col-lg-4 mt-3 mt-lg-0">
+                <div class="d-flex flex-column gap-2">
+                    <a href="{% url 'case_edit' case.pk %}" class="btn btn-navy">
+                        <i class="bi bi-pencil me-2"></i>Edit Case
+                    </a>
+                    <button class="btn btn-gold" onclick="openCoreSummaryModal()">
+                        <i class="bi bi-magic me-2"></i>Create Summary
+                    </button>
+                    <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#addUpdateModal">
+                        <i class="bi bi-plus-circle me-2"></i>Add Update
+                    </button>
+                    {% if case.status == 'disposed' %}
+                    <a href="{% url 'record_outcome' case.pk %}" class="btn btn-outline-success">
+                        <i class="bi bi-journal-check me-2"></i>Record Outcome
+                    </a>
+                    {% endif %}
+                    <a href="{% url 'generate_document' case.pk %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-file-earmark-text me-2"></i>Generate Document
+                    </a>
+                    <a href="{% url 'manage_client_access' case.pk %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-person-badge me-2"></i>Client Access
+                    </a>
+                    <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#uploadDocModal">
+                        <i class="bi bi-upload me-2"></i>Upload Document
+                    </button>
+                    {% if user.role == 'admin' or user.is_superuser %}
+                    <a href="{% url 'case_delete' case.pk %}" class="btn btn-outline-danger">
+                        <i class="bi bi-trash me-2"></i>Delete Case
+                    </a>
+                    {% endif %}
+                </div>
+
+                <div class="mt-3 p-3 rounded" style="background:#f9fafb;border:1px solid #e5e7eb;font-size:12px;color:#6b7280">
+                    <div class="mb-1"><i class="bi bi-clock me-1"></i>Created {{ case.created_at|date:"d M Y" }}</div>
+                    {% if case.created_by %}
+                    <div><i class="bi bi-person me-1"></i>By {{ case.created_by.get_full_name|default:case.created_by.username }}</div>
+                    {% endif %}
+                    <div class="mt-1"><i class="bi bi-arrow-repeat me-1"></i>Updated {{ case.updated_at|date:"d M Y" }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Tab Navigation ──────────────────────────────────────── -->
+<style>
+.case-tabs-wrap {
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; margin-bottom: 20px;
+}
+.case-tabs-wrap::-webkit-scrollbar { display: none; }
+.case-tabs {
+    display: flex; gap: 4px; flex-wrap: nowrap;
+    background: white; border: 1px solid #e5e7eb;
+    border-radius: 12px; padding: 6px; min-width: max-content;
+}
+.case-tab {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px; border-radius: 8px;
+    font-size: 13px; font-weight: 500; color: #6b7280;
+    white-space: nowrap; cursor: pointer; border: none;
+    background: none; transition: all .18s;
+}
+.case-tab:hover { background: #f3f4f6; color: #0f1b35; }
+.case-tab.active { background: #0f1b35; color: white; font-weight: 600; }
+.case-tab .tab-badge {
+    font-size: 10px; font-weight: 700;
+    padding: 1px 6px; border-radius: 10px; min-width: 18px; text-align: center;
+    background: #f3f4f6; color: #6b7280;
+}
+.case-tab.active .tab-badge { background: rgba(255,255,255,0.2); color: white; }
+.tab-sep { width: 1px; background: #e5e7eb; margin: 4px 2px; flex-shrink: 0; align-self: stretch; }
+</style>
+
+<div class="case-tabs-wrap">
+    <div class="case-tabs">
+        <button class="case-tab active" data-tab="timeline" onclick="switchCaseTab('timeline',this)">
+            <i class="bi bi-clock-history"></i> Timeline
+            <span class="tab-badge">{{ updates.count }}</span>
+        </button>
+        <button class="case-tab" data-tab="documents" onclick="switchCaseTab('documents',this)">
+            <i class="bi bi-file-earmark"></i> Documents
+            <span class="tab-badge">{{ documents.count }}</span>
+        </button>
+        <button class="case-tab" data-tab="comments" onclick="switchCaseTab('comments',this)">
+            <i class="bi bi-chat-dots"></i> Comments
+            <span class="tab-badge">{{ comments.count }}</span>
+        </button>
+        <div class="tab-sep"></div>
+        <button class="case-tab" data-tab="casehistory" onclick="switchCaseTab('casehistory',this)">
+            <i class="bi bi-calendar2-week"></i> Case History
+            <span class="tab-badge">{{ case.hearing_records.count }}</span>
+        </button>
+        <div class="tab-sep"></div>
+        <button class="case-tab" data-tab="deadlines" onclick="switchCaseTab('deadlines',this)">
+            <i class="bi bi-flag"></i> Deadlines
+            <span class="tab-badge">{{ case.deadlines.count }}</span>
+            {% if case.overdue_deadlines_count > 0 %}<span style="background:#fee2e2;color:#991b1b;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:2px">{{ case.overdue_deadlines_count }}!</span>{% endif %}
+        </button>
+        <button class="case-tab" data-tab="tasks" onclick="switchCaseTab('tasks',this)">
+            <i class="bi bi-check2-square"></i> Tasks
+            <span class="tab-badge">{{ case.pending_tasks_count }}</span>
+        </button>
+        <button class="case-tab" data-tab="recipients" onclick="switchCaseTab('recipients',this)">
+            <i class="bi bi-envelope"></i> Recipients
+        </button>
+        <div class="tab-sep"></div>
+        <button class="case-tab" data-tab="timelog" onclick="switchCaseTab('timelog',this)">
+            <i class="bi bi-clock"></i> Time Log
+        </button>
+        <button class="case-tab" data-tab="ai" onclick="switchCaseTab('ai',this)">
+            <i class="bi bi-stars"></i> AI Analysis
+        </button>
+    </div>
+</div>
+
+<script>
+function switchCaseTab(tabId, btn) {
+    document.querySelectorAll('.case-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.case-tab-pane').forEach(p => p.style.display = 'none');
+    const pane = document.getElementById('tab-pane-' + tabId);
+    if (pane) pane.style.display = 'block';
+    btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    history.replaceState(null, '', '#' + tabId);
+}
+document.addEventListener('DOMContentLoaded', function() {
+    const hash = (window.location.hash || '').replace('#', '');
+    const params = new URLSearchParams(window.location.search);
+    const validTabs = ['timeline','documents','comments','casehistory','deadlines','tasks','recipients','timelog','ai'];
+    const aliasMap = { hearings: 'casehistory', history: 'casehistory', orders: 'casehistory' };
+    let startTab = aliasMap[hash] || (validTabs.includes(hash) ? hash : 'timeline');
+    if (params.get('sub') === 'orders') {
+        startTab = 'casehistory';
+    }
+    const btn = document.querySelector(`.case-tab[data-tab="${startTab}"]`);
+    if (btn) switchCaseTab(startTab, btn);
+    const sub = (params.get('sub') || '').toLowerCase();
+    if (startTab === 'casehistory' && window.bootstrap && bootstrap.Tab) {
+        if (sub === 'orders' || hash === 'orders') {
+            const ordersPill = document.getElementById('sub-orders-tab');
+            if (ordersPill) new bootstrap.Tab(ordersPill).show();
+        } else if (sub === 'history' || hash === 'history') {
+            const historyPill = document.getElementById('sub-history-tab');
+            if (historyPill) new bootstrap.Tab(historyPill).show();
+        } else if (sub === 'hearings' || hash === 'hearings') {
+            const hearingsPill = document.getElementById('sub-hearings-tab');
+            if (hearingsPill) new bootstrap.Tab(hearingsPill).show();
+        }
+    }
+});
+</script>
+
+<div id="caseTabContent">
+
+    <!-- ── Timeline Tab ──────────────────────────────────── -->
+    <div class="case-tab-pane" id="tab-pane-timeline" style="display:block">
+        <div class="row">
+            <div class="col-lg-12">
+                {% if updates %}
+                <div class="timeline">
+                    {% for update in updates %}
+                    <div class="timeline-item {% if forloop.first %}latest{% endif %}">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-card">
+                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                <div>
+                                    <span class="fw-semibold" style="font-size:15px;color:#0f1b35">{{ update.title }}</span>
+                                    {% if forloop.first %}
+                                    <span class="badge ms-2" style="background:#fef3c7;color:#92400e;font-size:10px">Latest</span>
+                                    {% endif %}
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-muted" style="font-size:12px">{{ update.date|date:"d M Y" }}</span>
+                                    {% if user.role == 'admin' or user.is_superuser or update.created_by == user %}
+                                    <form method="post" action="{% url 'delete_case_update' case.pk update.pk %}" class="d-inline" onsubmit="return confirm('Delete this update?')">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-link text-danger p-0">
+                                            <i class="bi bi-trash" style="font-size:13px"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="row g-3 mt-1">
+                                <div class="col-lg-7">
+                                    <p style="font-size:14px;color:#374151;line-height:1.65;margin:0 0 8px 0">{{ update.description|urlize|linebreaksbr }}</p>
+                                    {% if update.order_details or update.filing_response or update.response_received or update.internal_notes or update.related_document or update.attachments.all %}
+                                    <div class="mt-2 p-2 rounded" style="background:#f8fafc;border:1px solid #e5e7eb">
+                                        <div class="row g-2" style="font-size:12px">
+                                            {% if update.order_details %}
+                                            <div class="col-12">
+                                                <div class="text-muted fw-semibold">Order Details</div>
+                                                <div style="color:#111827">{{ update.order_details|linebreaksbr }}</div>
+                                            </div>
+                                            {% endif %}
+                                            {% if update.filing_response %}
+                                            <div class="col-12">
+                                                <div class="text-muted fw-semibold">Our Response</div>
+                                                <div style="color:#111827">{{ update.filing_response|linebreaksbr }}</div>
+                                            </div>
+                                            {% endif %}
+                                            {% if update.response_received %}
+                                            <div class="col-12">
+                                                <div class="text-muted fw-semibold">Response Received</div>
+                                                <div style="color:#111827">{{ update.response_received|linebreaksbr }}</div>
+                                            </div>
+                                            {% endif %}
+                                            {% if update.internal_notes %}
+                                            <div class="col-12">
+                                                <div class="text-muted fw-semibold">Note</div>
+                                                <div style="color:#111827">{{ update.internal_notes|linebreaksbr }}</div>
+                                            </div>
+                                            {% endif %}
+                                            {% if update.attachments.all %}
+                                            <div class="col-12">
+                                                <div class="text-muted fw-semibold">Timeline Documents</div>
+                                                <div class="d-flex flex-wrap gap-2">
+                                                    {% for attachment in update.attachments.all %}
+                                                    <a href="{% url 'download_document' attachment.document.pk %}" class="badge bg-light text-dark border text-decoration-none">
+                                                        <i class="bi bi-paperclip me-1"></i>{{ attachment.document.title|default:attachment.document.filename|truncatechars:40 }}
+                                                    </a>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-lg-5">
+                                    <div class="p-2 rounded" style="background:#f9fafb;border:1px solid #e5e7eb">
+                                        <div class="fw-semibold mb-2" style="font-size:12px;color:#0f1b35">Update Details</div>
+                                        <form method="post" action="{% url 'update_case_update_details' case.pk update.pk %}">
+                                            {% csrf_token %}
+                                            <div class="mb-2">
+                                                <label class="form-label mb-1" style="font-size:11px;font-weight:600">Order Details</label>
+                                                <textarea name="order_details" rows="2" class="form-control form-control-sm">{{ update.order_details }}</textarea>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label mb-1" style="font-size:11px;font-weight:600">Our Response</label>
+                                                <textarea name="filing_response" rows="2" class="form-control form-control-sm">{{ update.filing_response }}</textarea>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label mb-1" style="font-size:11px;font-weight:600">Response Received</label>
+                                                <textarea name="response_received" rows="2" class="form-control form-control-sm">{{ update.response_received }}</textarea>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label mb-1" style="font-size:11px;font-weight:600">Notes</label>
+                                                <textarea name="internal_notes" rows="2" class="form-control form-control-sm">{{ update.internal_notes }}</textarea>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label mb-1" style="font-size:11px;font-weight:600">Attach Multiple Documents</label>
+                                                <select name="timeline_documents" class="form-select form-select-sm" multiple size="4">
+                                                    {% for doc in documents %}
+                                                    <option value="{{ doc.pk }}" {% for a in update.attachments.all %}{% if a.document_id == doc.pk %}selected{% endif %}{% endfor %}>
+                                                        {{ doc.folder|default:"Uncategorized" }} / {{ doc.title|default:doc.filename }}
+                                                    </option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <button type="submit" class="btn btn-sm btn-outline-primary w-100">Save Timeline Details</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-3" style="font-size:12px;color:#6b7280">
+                                {% if update.next_action_date %}
+                                <span><i class="bi bi-arrow-right-circle me-1 text-warning"></i>Next action: {{ update.next_action_date|date:"d M Y" }}</span>
+                                {% endif %}
+                                {% if update.created_by %}
+                                <span><i class="bi bi-person me-1"></i>{{ update.created_by.get_full_name|default:update.created_by.username }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-clock-history text-muted" style="font-size:40px;display:block;margin-bottom:12px"></i>
+                    <p class="text-muted">No updates yet. Add the first case update.</p>
+                    <button class="btn btn-navy btn-sm" data-bs-toggle="modal" data-bs-target="#addUpdateModal">
+                        <i class="bi bi-plus-lg me-1"></i> Add Update
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+            <!-- Quick Updated Columm Start -->
+            <!-- <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">Quick Add Update</div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'add_case_update' case.pk %}">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label class="form-label" style="font-size:12px;font-weight:600">Date</label>
+                                {{ update_form.date }}
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" style="font-size:12px;font-weight:600">Title</label>
+                                {{ update_form.title }}
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" style="font-size:12px;font-weight:600">Description</label>
+                                {{ update_form.description }}
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" style="font-size:12px;font-weight:600">Order Details</label>
+                                {{ update_form.order_details }}
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" style="font-size:12px;font-weight:600">Our Response</label>
+                                {{ update_form.filing_response }}
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" style="font-size:12px;font-weight:600">Response Received</label>
+                                {{ update_form.response_received }}
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" style="font-size:12px;font-weight:600">Internal Note</label>
+                                {{ update_form.internal_notes }}
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" style="font-size:12px;font-weight:600">Next Action Date</label>
+                                {{ update_form.next_action_date }}
+                            </div>
+                            <button type="submit" class="btn btn-navy w-100">
+                                <i class="bi bi-plus-circle me-1"></i> Add Update
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                <div class="card mt-3">
+                    <div class="card-header">Extract PDF to Timeline</div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold" style="font-size:12px">Source</label>
+                            <select id="pdfExtractSourceType" class="form-select form-select-sm">
+                                <option value="document">Case document PDF</option>
+                                <option value="url">PDF URL</option>
+                            </select>
+                        </div>
+                        <div class="mb-2" id="pdfExtractDocWrap">
+                            <label class="form-label fw-semibold" style="font-size:12px">Select PDF document</label>
+                            <select id="pdfExtractDocId" class="form-select form-select-sm">
+                                <option value="">-- Select PDF --</option>
+                                {% for doc in documents %}
+                                {% if doc.is_pdf %}
+                                <option value="{{ doc.pk }}">{{ doc.title|default:doc.filename }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-2" id="pdfExtractUrlWrap" style="display:none">
+                            <label class="form-label fw-semibold" style="font-size:12px">PDF URL</label>
+                            <input type="url" id="pdfExtractUrl" class="form-control form-control-sm" placeholder="https://...pdf">
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="pdfIncludeTimeline" checked>
+                            <label class="form-check-label" for="pdfIncludeTimeline" style="font-size:12px">Create timeline updates from PDF</label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="pdfIncludeSummary" checked>
+                            <label class="form-check-label" for="pdfIncludeSummary" style="font-size:12px">Also create PDF summary update</label>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-navy w-100" onclick="extractPdfTimeline()">
+                            <i class="bi bi-magic me-1"></i>Extract & Add to Timeline
+                        </button>
+                        <div id="pdfExtractStatus" class="mt-2 text-muted" style="font-size:12px"></div>
+                    </div>
+                </div>
+            </div> -->
+        </div>
+    </div>
+
+    <!-- ── Documents Tab ─────────────────────────────────── -->
+    <div class="case-tab-pane" id="tab-pane-documents" style="display:none">
+        <div class="row">
+            <div class="col-lg-8">
+                {% if documents %}
+                <div class="accordion" id="caseFoldersAccordion">
+                    {% for folder_name, folder_docs in documents_by_folder %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="folder-head-{{ forloop.counter }}">
+                            <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#folder-collapse-{{ forloop.counter }}">
+                                <i class="bi bi-folder2-open me-2"></i>{{ folder_name }} <span class="badge bg-light text-dark border ms-2">{{ folder_docs|length }}</span>
+                            </button>
+                        </h2>
+                        <div id="folder-collapse-{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#caseFoldersAccordion">
+                            <div class="accordion-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>File</th>
+                                                <th>Type</th>
+                                                <th>Tags</th>
+                                                <th>Uploaded</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for doc in folder_docs %}
+                                            <tr>
+                                                <td>
+                                                    <div class="fw-semibold" style="font-size:13px">{{ doc.title|default:doc.filename }}</div>
+                                                    <div class="text-muted" style="font-size:11px">{{ doc.filename }}</div>
+                                                </td>
+                                                <td><span class="badge bg-light text-dark border" style="font-size:10px">{{ doc.get_document_type_display }}</span></td>
+                                                <td style="font-size:12px">{{ doc.tags|default:"—" }}</td>
+                                                <td style="font-size:12px">{{ doc.uploaded_at|date:"d M Y, H:i" }}</td>
+                                                <td>
+                                                    <div class="d-flex gap-1">
+                                                        <a href="{% url 'download_document' doc.pk %}" class="btn btn-sm btn-outline-primary" style="font-size:12px"><i class="bi bi-download"></i></a>
+                                                        {% if doc.is_pdf %}
+                                                        <a href="{{ doc.file.url }}" target="_blank" class="btn btn-sm btn-outline-secondary" style="font-size:12px" title="Preview"><i class="bi bi-eye"></i></a>
+                                                        {% endif %}
+                                                        {% if user.role == 'admin' or user.is_superuser or doc.uploaded_by == user %}
+                                                        <form method="post" action="{% url 'delete_document' case.pk doc.pk %}" onsubmit="return confirm('Delete this document?')">
+                                                            {% csrf_token %}
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger" style="font-size:12px" title="Delete"><i class="bi bi-trash"></i></button>
+                                                        </form>
+                                                        {% endif %}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-file-earmark text-muted" style="font-size:40px;display:block;margin-bottom:12px"></i>
+                    <p class="text-muted">No documents uploaded yet.</p>
+                    <button class="btn btn-navy btn-sm" data-bs-toggle="modal" data-bs-target="#uploadDocModal">
+                        <i class="bi bi-upload me-1"></i> Upload Document
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+            <div class="col-lg-4 mt-3 mt-lg-0">
+                <div class="card">
+                    <div class="card-header">Upload Document</div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'upload_document' case.pk %}" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label class="form-label" style="font-size:12px;font-weight:600">Title (optional)</label>
+                                {{ document_form.title }}
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" style="font-size:12px;font-weight:600">Document Type</label>
+                                {{ document_form.document_type }}
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" style="font-size:12px;font-weight:600">Folder</label>
+                                {{ document_form.folder }}
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" style="font-size:12px;font-weight:600">Tags</label>
+                                {{ document_form.tags }}
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" style="font-size:12px;font-weight:600">File</label>
+                                {{ document_form.file }}
+                                <div class="form-text">PDF, DOC, DOCX, JPG, PNG — max 10MB</div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" style="font-size:12px;font-weight:600">Notes</label>
+                                {{ document_form.notes }}
+                            </div>
+                            <button type="submit" class="btn btn-navy w-100">
+                                <i class="bi bi-upload me-1"></i> Upload
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Comments Tab ──────────────────────────────────── -->
+    <div class="case-tab-pane" id="tab-pane-comments" style="display:none">
+        <div class="row">
+            <div class="col-lg-8">
+                <!-- Add Comment Form -->
+                <div class="card mb-4">
+                    <div class="card-header">Add Comment</div>
+                    <div class="card-body">
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="add_comment" value="1">
+                            <div class="mb-3">
+                                {{ comment_form.comment }}
+                            </div>
+                            <button type="submit" class="btn btn-navy btn-sm">
+                                <i class="bi bi-send me-1"></i> Post Comment
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Comments List -->
+                {% if comments %}
+                <div class="card">
+                    <div class="card-body p-0 px-3">
+                        {% for comment in comments %}
+                        <div class="comment-item">
+                            <div class="d-flex gap-3 align-items-start">
+                                <div class="comment-avatar">
+                                    {{ comment.user.get_full_name|default:comment.user.username|slice:":1"|upper }}
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="fw-semibold" style="font-size:13px">
+                                                {{ comment.user.get_full_name|default:comment.user.username }}
+                                            </span>
+                                            <span class="badge ms-2" style="background:#f3f4f6;color:#6b7280;font-size:10px;font-weight:500">
+                                                {{ comment.user.get_role_display }}
+                                            </span>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="text-muted" style="font-size:12px">
+                                                {{ comment.created_at|date:"d M Y, H:i" }}
+                                            </span>
+                                            {% if user == comment.user or user.role == 'admin' %}
+                                            <form method="post" action="{% url 'delete_comment' case.pk comment.pk %}" onsubmit="return confirm('Delete comment?')">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-link btn-sm text-danger p-0">
+                                                    <i class="bi bi-trash" style="font-size:12px"></i>
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <p class="mt-1 mb-0" style="font-size:14px;color:#374151;line-height:1.65">
+                                        {{ comment.comment }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-chat-dots text-muted" style="font-size:40px;display:block;margin-bottom:12px"></i>
+                    <p class="text-muted">No comments yet. Be the first to add a note.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- ── Deadlines Tab ──────────────────────────────────── -->
+    <div class="case-tab-pane" id="tab-pane-deadlines" style="display:none">
+        <div class="row">
+            <div class="col-lg-8">
+                {% if case.deadlines.all %}
+                <div class="deadline-list">
+                {% for dl in case.deadlines.all %}
+                <div class="deadline-item {% if dl.urgency_class == 'overdue' %}dl-overdue{% elif dl.urgency_class == 'critical' %}dl-critical{% elif dl.urgency_class == 'warning' %}dl-warning{% elif dl.is_completed %}dl-done{% endif %}">
+                    <div class="d-flex align-items-start gap-3">
+                        <div class="pt-1">
+                            {% if dl.is_completed %}
+                            <i class="bi bi-check-circle-fill text-success" style="font-size:16px"></i>
+                            {% elif dl.urgency_class == 'overdue' %}
+                            <i class="bi bi-exclamation-triangle-fill text-danger" style="font-size:16px"></i>
+                            {% elif dl.urgency_class == 'critical' %}
+                            <i class="bi bi-clock-fill text-danger" style="font-size:16px"></i>
+                            {% else %}
+                            <i class="bi bi-flag text-warning" style="font-size:16px"></i>
+                            {% endif %}
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <span class="fw-semibold {% if dl.is_completed %}text-decoration-line-through text-muted{% endif %}" style="font-size:14px">{{ dl.title }}</span>
+                                    <span class="badge {{ dl.priority_badge }} ms-2" style="font-size:10px">{{ dl.get_priority_display }}</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                    <div class="text-end">
+                                        <div class="fw-semibold" style="font-size:13px;color:{% if dl.urgency_class == 'overdue' %}#dc2626{% elif dl.urgency_class == 'critical' %}#d97706{% else %}#374151{% endif %}">
+                                            {{ dl.due_date|date:"d M Y" }}
+                                        </div>
+                                        {% if not dl.is_completed %}
+                                        <div style="font-size:11px;color:#6b7280">
+                                            {% if dl.days_remaining < 0 %}{{ dl.days_remaining|stringformat:"+d" }}d overdue
+                                            {% elif dl.days_remaining == 0 %}Due today
+                                            {% else %}{{ dl.days_remaining }}d left{% endif %}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% if dl.description %}<p class="text-muted mb-1 mt-1" style="font-size:12px">{{ dl.description }}</p>{% endif %}
+                            <div class="d-flex gap-2 mt-2">
+                                {% if not dl.is_completed %}
+                                <form method="post" action="{% url 'complete_deadline' case.pk dl.pk %}">{% csrf_token %}
+                                    <button class="btn btn-sm btn-outline-success" style="font-size:11px;padding:2px 8px"><i class="bi bi-check me-1"></i>Complete</button>
+                                </form>
+                                {% else %}
+                                <span class="text-muted" style="font-size:11px">Completed {{ dl.completed_at|date:"d M Y" }}</span>
+                                {% endif %}
+                                {% if user.role == 'admin' or user.is_superuser or dl.created_by == user %}
+                                <form method="post" action="{% url 'delete_deadline' case.pk dl.pk %}" onsubmit="return confirm('Delete deadline?')">{% csrf_token %}
+                                    <button class="btn btn-sm btn-outline-danger" style="font-size:11px;padding:2px 8px"><i class="bi bi-trash"></i></button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-5"><i class="bi bi-flag text-muted" style="font-size:36px;display:block;margin-bottom:10px;opacity:.4"></i><p class="text-muted">No deadlines yet.</p></div>
+                {% endif %}
+            </div>
+            <div class="col-lg-4 mt-3 mt-lg-0">
+                <div class="card">
+                    <div class="card-header">Add Deadline</div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'add_deadline' case.pk %}">
+                            {% csrf_token %}
+                            <div class="mb-3"><label class="form-label fw-semibold" style="font-size:12px">Title *</label>{{ deadline_form.title }}</div>
+                            <div class="mb-3"><label class="form-label fw-semibold" style="font-size:12px">Due Date *</label>{{ deadline_form.due_date }}</div>
+                            <div class="mb-3"><label class="form-label fw-semibold" style="font-size:12px">Priority</label>{{ deadline_form.priority }}</div>
+                            <div class="mb-3"><label class="form-label fw-semibold" style="font-size:12px">Description</label>{{ deadline_form.description }}</div>
+                            <button type="submit" class="btn btn-navy w-100"><i class="bi bi-flag me-1"></i>Add Deadline</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Tasks Tab ──────────────────────────────────────── -->
+    <div class="case-tab-pane" id="tab-pane-tasks" style="display:none">
+        <div class="row">
+            <div class="col-lg-8">
+                {% if case.tasks.all %}
+                <div class="task-list">
+                {% for task in case.tasks.all %}
+                <div class="task-item {% if task.is_completed %}task-done{% elif task.is_overdue %}task-overdue{% endif %}">
+                    <div class="d-flex align-items-start gap-3">
+                        <div class="pt-1">
+                            {% if task.is_completed %}
+                            <i class="bi bi-check-circle-fill text-success" style="font-size:15px"></i>
+                            {% elif task.is_overdue %}
+                            <i class="bi bi-exclamation-circle-fill text-danger" style="font-size:15px"></i>
+                            {% else %}
+                            <i class="bi bi-circle text-secondary" style="font-size:15px"></i>
+                            {% endif %}
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <span class="fw-semibold {% if task.is_completed %}text-decoration-line-through text-muted{% endif %}" style="font-size:14px">{{ task.title }}</span>
+                                <div class="d-flex gap-1 flex-shrink-0">
+                                    {% if not task.is_completed %}
+                                    <form method="post" action="{% url 'complete_task' case.pk task.pk %}">{% csrf_token %}
+                                        <button class="btn btn-sm btn-outline-success" style="font-size:11px;padding:2px 8px"><i class="bi bi-check"></i></button>
+                                    </form>
+                                    {% endif %}
+                                    <form method="post" action="{% url 'delete_task' case.pk task.pk %}" onsubmit="return confirm('Delete task?')">{% csrf_token %}
+                                        <button class="btn btn-sm btn-outline-danger" style="font-size:11px;padding:2px 8px"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-3 mt-1" style="font-size:12px;color:#6b7280">
+                                {% if task.assigned_to %}<span><i class="bi bi-person me-1"></i>{{ task.assigned_to.get_full_name|default:task.assigned_to.username }}</span>{% endif %}
+                                {% if task.due_date %}<span><i class="bi bi-calendar me-1"></i>{% if task.is_overdue %}<span class="text-danger fw-semibold">Overdue — {% endif %}{{ task.due_date|date:"d M Y" }}{% if task.is_overdue %}</span>{% endif %}</span>{% endif %}
+                            </div>
+                            {% if task.description %}<p class="text-muted mb-0 mt-1" style="font-size:12px">{{ task.description }}</p>{% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-5"><i class="bi bi-check2-square text-muted" style="font-size:36px;display:block;margin-bottom:10px;opacity:.4"></i><p class="text-muted">No tasks yet.</p></div>
+                {% endif %}
+            </div>
+            <div class="col-lg-4 mt-3 mt-lg-0">
+                <div class="card">
+                    <div class="card-header">Add Task</div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'add_task' case.pk %}">
+                            {% csrf_token %}
+                            <div class="mb-3"><label class="form-label fw-semibold" style="font-size:12px">Task *</label>{{ task_form.title }}</div>
+                            <div class="mb-3"><label class="form-label fw-semibold" style="font-size:12px">Assign To</label>{{ task_form.assigned_to }}</div>
+                            <div class="mb-3"><label class="form-label fw-semibold" style="font-size:12px">Due Date</label>{{ task_form.due_date }}</div>
+                            <div class="mb-3"><label class="form-label fw-semibold" style="font-size:12px">Description</label>{{ task_form.description }}</div>
+                            <button type="submit" class="btn btn-navy w-100"><i class="bi bi-plus me-1"></i>Add Task</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Alert Recipients Tab ───────────────────────────── -->
+    <div class="case-tab-pane" id="tab-pane-recipients" style="display:none">
+        <div class="row">
+            <div class="col-lg-7">
+                {% if case.email_recipients.all %}
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>{{ case.email_recipients.count }} Stored Recipient{{ case.email_recipients.count|pluralize }}</span>
+                        {% if case.next_hearing_date %}
+                        <form method="post" action="{% url 'manage_recipients' case.pk %}">
+                            {% csrf_token %}<input type="hidden" name="action" value="send_now">
+                            <button class="btn btn-sm" style="background:#166534;color:white;font-size:12px"><i class="bi bi-send me-1"></i>Send Alert Now to All</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                    <div class="card-body p-0">
+                    {% for r in case.email_recipients.all %}
+                    <div class="d-flex align-items-center gap-3 px-3 py-2 border-bottom">
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold" style="font-size:13px">{{ r.email }}</div>
+                            {% if r.name %}<div class="text-muted" style="font-size:11px">{{ r.name }}</div>{% endif %}
+                        </div>
+                        <span class="badge {% if r.is_active %}badge-disposed{% else %}badge-hold{% endif %}" style="font-size:10px">{% if r.is_active %}Active{% else %}Paused{% endif %}</span>
+                        <form method="post" action="{% url 'manage_recipients' case.pk %}">
+                            {% csrf_token %}<input type="hidden" name="action" value="remove"><input type="hidden" name="recipient_id" value="{{ r.pk }}">
+                            <button class="btn btn-sm btn-outline-danger" style="font-size:11px;padding:2px 8px" onclick="return confirm('Remove this recipient?')"><i class="bi bi-trash"></i></button>
+                        </form>
+                    </div>
+                    {% endfor %}
+                    </div>
+                </div>
+                <div class="mt-2 p-3 rounded" style="background:#f0fdf4;border:1px solid #bbf7d0;font-size:12px;color:#166534">
+                    <i class="bi bi-info-circle me-1"></i>
+                    These recipients are automatically emailed when the hearing date changes, and receive reminders 7 days and 1 day before the hearing.
+                    Your team can also trigger this from Dashboard using the <strong>Send Reminders Now</strong> button (no Python command required).
+                </div>
+                {% else %}
+                <div class="text-center py-5"><i class="bi bi-envelope text-muted" style="font-size:36px;display:block;margin-bottom:10px;opacity:.4"></i><p class="text-muted">No recipients added yet. Add emails to receive automatic hearing alerts.</p></div>
+                {% endif %}
+            </div>
+            <div class="col-lg-5 mt-3 mt-lg-0">
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-envelope-plus me-1"></i>Add Recipient</div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'manage_recipients' case.pk %}">
+                            {% csrf_token %}<input type="hidden" name="action" value="add">
+                            <div class="mb-3"><label class="form-label fw-semibold" style="font-size:12px">Email Address *</label>{{ recipient_form.email }}</div>
+                            <div class="mb-3"><label class="form-label fw-semibold" style="font-size:12px">Label (optional)</label>{{ recipient_form.name }}</div>
+                            <button type="submit" class="btn btn-navy w-100"><i class="bi bi-person-plus me-1"></i>Add Recipient</button>
+                        </form>
+                        {% if case.next_hearing_date %}
+                        <hr>
+                        <p class="text-muted mb-2" style="font-size:12px"><strong>Next hearing:</strong> {{ case.next_hearing_date|date:"d M Y" }}</p>
+                        <form method="post" action="{% url 'manage_recipients' case.pk %}">
+                            {% csrf_token %}<input type="hidden" name="action" value="send_now">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm w-100" style="font-size:12px"><i class="bi bi-send me-1"></i>Send Hearing Alert to All Now</button>
+                        </form>
+                        {% else %}
+                        <div class="mt-3 p-2 rounded" style="background:#fef3c7;border:1px solid #fcd34d;font-size:12px;color:#92400e">No hearing date set on this case yet.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+    <!-- ── Time Log Tab ──────────────────────────────────── -->
+    <div class="case-tab-pane" id="tab-pane-timelog" style="display:none">
+        <div class="row">
+            <div class="col-lg-8">
+                {% with entries=case.time_entries.all %}
+                {% if entries %}
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>
+                            Total: <strong>{{ entries|length }}</strong> entries &nbsp;·&nbsp;
+                            {% with total=case.time_entries.all %}
+                            <strong id="total-hours">see below</strong>
+                            {% endwith %}
+                        </span>
+                    </div>
+                    <div class="table-responsive">
+                    <table class="table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Lawyer</th>
+                                <th>Hours</th>
+                                <th>Description</th>
+                                <th>Billable</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for entry in entries %}
+                        <tr>
+                            <td style="font-size:12px">{{ entry.date|date:"d M Y" }}</td>
+                            <td style="font-size:12px">{{ entry.user.get_full_name|default:entry.user.username|default:"—" }}</td>
+                            <td><span class="fw-semibold" style="font-size:13px">{{ entry.hours }}h</span></td>
+                            <td style="font-size:12px">{{ entry.description }}</td>
+                            <td>
+                                {% if entry.is_billable %}
+                                <span class="badge badge-outcome-won" style="font-size:10px">Billable</span>
+                                {% else %}
+                                <span class="badge badge-outcome-other" style="font-size:10px">Non-bill.</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user == entry.user or user.role == 'admin' %}
+                                <form method="post" action="{% url 'delete_time_entry' case.pk entry.pk %}" onsubmit="return confirm('Delete?')">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm btn-outline-danger" style="font-size:11px;padding:1px 7px"><i class="bi bi-trash"></i></button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-5"><i class="bi bi-clock text-muted" style="font-size:36px;display:block;margin-bottom:10px;opacity:.4"></i><p class="text-muted">No time logged yet.</p></div>
+                {% endif %}
+                {% endwith %}
+            </div>
+            <div class="col-lg-4 mt-3 mt-lg-0">
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-plus-circle me-1"></i>Log Time</div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'add_time_entry' case.pk %}">
+                            {% csrf_token %}
+                            <div class="mb-3"><label class="form-label fw-semibold" style="font-size:12px">Date</label>{{ time_form.date }}</div>
+                            <div class="mb-3"><label class="form-label fw-semibold" style="font-size:12px">Hours (e.g. 1.5)</label>{{ time_form.hours }}</div>
+                            <div class="mb-3"><label class="form-label fw-semibold" style="font-size:12px">What was done</label>{{ time_form.description }}</div>
+                            <div class="mb-3 form-check">{{ time_form.is_billable }}<label class="form-check-label" style="font-size:13px">Billable</label></div>
+                            <button class="btn btn-navy w-100"><i class="bi bi-clock me-1"></i>Log Time</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ── Hearings Tab ──────────────────────────────────── -->
+    <div class="case-tab-pane" id="tab-pane-casehistory" style="display:none">
+
+        <!-- ── Sub-tabs: Hearings | Order PDFs | Change Log ──────────────── -->
+        <ul class="nav nav-pills mb-4" id="caseHistorySubTabs" style="gap:6px">
+            <li class="nav-item">
+                <a class="nav-link active px-3 py-2" id="sub-hearings-tab" data-bs-toggle="pill" href="#sub-hearings" style="font-size:13px;border-radius:8px;background:#0f1b35;color:white">
+                    <i class="bi bi-calendar2-week me-1"></i> Hearings
+                    <span class="badge ms-1" style="background:rgba(255,255,255,0.2);color:white;font-size:10px">{{ case.hearing_records.count }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link px-3 py-2" id="sub-orders-tab" data-bs-toggle="pill" href="#sub-orders" style="font-size:13px;border-radius:8px;background:#f3f4f6;color:#374151">
+                    <i class="bi bi-file-earmark-pdf me-1"></i> Order PDFs
+                    <span class="badge ms-1" style="background:#e5e7eb;color:#6b7280;font-size:10px">{{ court_order_count }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link px-3 py-2" id="sub-history-tab" data-bs-toggle="pill" href="#sub-history" style="font-size:13px;border-radius:8px;background:#f3f4f6;color:#374151">
+                    <i class="bi bi-journal-text me-1"></i> Change Log
+                    <span class="badge ms-1" style="background:#e5e7eb;color:#6b7280;font-size:10px">{{ case_history|length }}</span>
+                </a>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+
+            <!-- Hearings sub-pane -->
+            <div class="tab-pane fade show active" id="sub-hearings">
+        <h5 class="mb-3" style="font-family:'Playfair Display',serif;font-weight:700;color:#0f1b35;font-size:1.1rem">
+            <i class="bi bi-calendar2-week me-2" style="color:#c9a84c"></i>Hearing schedule
+        </h5>
+        <!-- Add Hearing Record form -->
+        <div class="card mb-4">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <span><i class="bi bi-calendar2-plus me-1 text-primary"></i>Add Hearing Record</span>
+                <span class="text-muted" style="font-size:11px">Or enter URL to auto-fetch from court website</span>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'add_hearing_record' case.pk %}">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold" style="font-size:12px">Hearing Date *</label>
+                            {{ hearing_form.hearing_date }}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold" style="font-size:12px">Next Hearing Date</label>
+                            {{ hearing_form.next_hearing_date }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size:12px">Purpose of Hearing *</label>
+                            {{ hearing_form.purpose }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size:12px">Judge / Bench</label>
+                            {{ hearing_form.judge_name }}
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold" style="font-size:12px">Outcome / Notes</label>
+                            {{ hearing_form.outcome_notes }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold" style="font-size:12px">Court URL (auto-scrape)</label>
+                            {{ hearing_form.scrape_url }}
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-navy btn-sm">
+                            <i class="bi bi-plus-circle me-1"></i>Save Hearing Record
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Hearing Records Table -->
+        {% if case.hearing_records.all %}
+        <h6 class="mb-2 mt-2" style="font-weight:700;color:#374151;font-size:13px;text-transform:uppercase;letter-spacing:.04em">Recorded hearings</h6>
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width:110px">Hearing Date</th>
+                            <th style="width:110px">Next Hearing</th>
+                            <th>Purpose</th>
+                            <th class="d-none d-md-table-cell" style="min-width:120px">Judge / Bench</th>
+                            <th class="d-none d-lg-table-cell">Outcome / Notes</th>
+                            <th class="text-center" style="width:80px">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for rec in case.hearing_records.all %}
+                    <tr>
+                        <td>
+                            <div class="fw-semibold" style="font-size:13px">{{ rec.hearing_date|date:"d M Y" }}</div>
+                            {% if rec.scrape_url %}
+                            <button class="btn btn-link btn-sm p-0 mt-1" style="font-size:10px;color:#0891b2"
+                                onclick="scrapeRecord({{ rec.pk }})">
+                                <i class="bi bi-cloud-download me-1"></i>Fetch
+                            </button>
+                            {% endif %}
+                        </td>
+                        <td style="font-size:13px">
+                            {% if rec.next_hearing_date %}{{ rec.next_hearing_date|date:"d M Y" }}
+                            {% else %}<span class="text-muted">—</span>{% endif %}
+                        </td>
+                        <td>
+                            <div style="font-size:13px;color:#0f1b35">{{ rec.purpose }}</div>
+                            {% if rec.scraped_data %}
+                            <span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:10px;margin-top:2px">
+                                <i class="bi bi-cloud-check me-1"></i>Scraped
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="d-none d-md-table-cell" style="font-size:12px;color:#374151">
+                            {% if rec.judge_name %}{{ rec.judge_name }}{% else %}<span class="text-muted">—</span>{% endif %}
+                        </td>
+                        <td class="d-none d-lg-table-cell" style="font-size:12px;color:#374151">
+                            {{ rec.outcome_notes|truncatechars:80|default:"—" }}
+                        </td>
+                        <td class="text-center">
+                            <!-- Action button opens AI modal -->
+                            <button class="btn btn-sm" style="background:#5b21b6;color:white;border:none;font-size:11px;padding:3px 10px"
+                                onclick="openHearingAI({{ rec.pk }}, '{{ rec.purpose|escapejs }}', '{{ rec.hearing_date|date:'d M Y' }}', '{{ rec.judge_name|escapejs }}', '{{ rec.outcome_notes|escapejs }}', '{{ rec.scraped_data|truncatechars:500|escapejs }}')">
+                                <i class="bi bi-stars me-1"></i>AI
+                            </button>
+                            {% if user.role == 'admin' or user.is_superuser or rec.created_by == user %}
+                            <form method="post" action="{% url 'delete_hearing_record' case.pk rec.pk %}"
+                                  class="d-inline" onsubmit="return confirm('Delete this record?')">
+                                {% csrf_token %}
+                                <button class="btn btn-sm btn-outline-danger ms-1" style="font-size:11px;padding:3px 8px">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-calendar2 text-muted" style="font-size:40px;display:block;margin-bottom:12px;opacity:.35"></i>
+            <p class="fw-semibold text-muted" style="font-size:14px">No hearing records yet</p>
+            <p class="text-muted" style="font-size:13px">Use the form above to add hearing dates, purposes, and outcomes.</p>
+        </div>
+        {% endif %}
+            </div><!-- /sub-hearings -->
+
+            <!-- Court order PDF register (High Court style) -->
+            <div class="tab-pane fade" id="sub-orders">
+        <h5 class="mb-2" style="font-family:'Playfair Display',serif;font-weight:700;color:#0f1b35;font-size:1.1rem">
+            <i class="bi bi-file-earmark-pdf me-2" style="color:#c9a84c"></i>Order register (PDF links)
+        </h5>
+        <p class="text-muted mb-3" style="font-size:13px">Each row is a <strong>direct PDF URL</strong> from the court or eCourts portal (opens in a new tab). Use the case number or order citation as the link label when needed.</p>
+
+        <div class="card mb-4">
+            <div class="card-header fw-semibold d-flex align-items-center gap-2" style="font-size:13px;background:#eef2ff;border-bottom-color:#c7d2fe;color:#3730a3">
+                <i class="bi bi-cloud-download"></i> Fetch order PDFs from Delhi High Court link
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'import_court_orders_from_url' case.pk %}">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <div class="col-lg-8">
+                            <label class="form-label fw-semibold" style="font-size:12px">Delhi High Court case-status URL *</label>
+                            <input type="url" name="source_url" class="form-control" placeholder="https://delhihighcourt.nic.in/app/case-type-status-details/...">
+                            <div class="form-text" style="font-size:11px">This importer reads the hidden AJAX order list and fills your register automatically.</div>
+                        </div>
+                        <div class="col-lg-4">
+                            <label class="form-label fw-semibold" style="font-size:12px">Parent/Base URL (optional)</label>
+                            <input type="url" name="parent_url" class="form-control" placeholder="https://nclt.gov.in/">
+                            <div class="form-text" style="font-size:11px">Use when PDF links are relative (e.g. <code>gen_pdf.php?... </code>).</div>
+                        </div>
+                        <div class="col-lg-2 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size:12px">Timeout</label>
+                            <input type="number" name="timeout_sec" class="form-control" min="10" max="120" value="35">
+                        </div>
+                        <div class="col-lg-2 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size:12px">SSL</label>
+                            <select name="verify_ssl" class="form-select">
+                                <option value="1" selected>Verify</option>
+                                <option value="0">Skip</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="create_timeline_from_orders" name="create_timeline" value="1" checked>
+                                <label class="form-check-label" for="create_timeline_from_orders" style="font-size:12px">
+                                    Also create timeline updates: title from CORAM, date from last order date in PDF text, and points in description
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold" style="font-size:12px">Or paste listing table HTML (optional)</label>
+                            <textarea name="pasted_html" class="form-control" rows="6"
+                                      placeholder='Paste copied HTML from inspect, e.g. &lt;table&gt;...&lt;a href="...pdf"&gt;View PDF&lt;/a&gt;...'></textarea>
+                            <div class="form-text" style="font-size:11px">
+                                Works for table rows containing listing date + PDF link. Keep source URL filled if links are relative (e.g. <code>gen_pdf.php?... </code>).
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-sm" style="background:#3730a3;color:white;border:none" onclick="return confirm('Fetch & import order PDFs from this link into the register?')">
+                                <i class="bi bi-download me-1"></i>Fetch & import into register
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header fw-semibold d-flex align-items-center gap-2" style="font-size:13px;background:#ecfeff;border-bottom-color:#a5f3fc;color:#0f766e">
+                <i class="bi bi-upload"></i> Upload order PDF and import into register
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'import_court_order_from_upload' case.pk %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <div class="col-lg-5 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size:12px">Order PDF file *</label>
+                            <input type="file" name="uploaded_pdf" class="form-control" accept=".pdf,application/pdf" required>
+                            <div class="form-text" style="font-size:11px">Uploads this PDF, adds it to documents, then inserts it in the order register.</div>
+                        </div>
+                        <div class="col-lg-4 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size:12px">Case No. / order link label (optional)</label>
+                            <input type="text" name="link_label" class="form-control" placeholder="e.g. W.P.(C)-IPD 31/2025">
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size:12px">Fallback order date (optional)</label>
+                            <input type="date" name="order_date" class="form-control">
+                            <div class="form-text" style="font-size:11px">Used only when date cannot be extracted from the PDF text.</div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="create_timeline_from_upload" name="create_timeline" value="1" checked>
+                                <label class="form-check-label" for="create_timeline_from_upload" style="font-size:12px">
+                                    Also create timeline updates: title from CORAM, date from last order date in PDF text, and points in description
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-sm" style="background:#0f766e;color:white;border:none" onclick="return confirm('Upload this PDF and import it into the order register?')">
+                                <i class="bi bi-upload me-1"></i>Upload & import into register
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header fw-semibold d-flex align-items-center gap-2" style="font-size:13px;background:#fef2f2;border-bottom-color:#fecaca;color:#991b1b">
+                <i class="bi bi-plus-circle"></i> Add order PDF
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'add_court_order_link' case.pk %}">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <div class="col-lg-4 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size:12px">Case No. / order link label</label>
+                            {{ court_order_form.link_label }}
+                            <div class="form-text" style="font-size:11px">Optional — defaults to this case’s case number.</div>
+                        </div>
+                        <div class="col-lg-5 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size:12px">PDF URL *</label>
+                            {{ court_order_form.pdf_url }}
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size:12px">Date of order *</label>
+                            {{ court_order_form.order_date }}
+                        </div>
+                        <div class="col-lg-4 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size:12px">Judge name</label>
+                            {{ court_order_form.judge_name }}
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-navy btn-sm"><i class="bi bi-link-45deg me-1"></i>Add to register</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if court_orders %}
+        <h6 class="mb-2" style="font-weight:700;color:#374151;font-size:13px;text-transform:uppercase;letter-spacing:.04em">Court order history</h6>
+        <div class="card border shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped mb-0 align-middle" id="courtOrdersTable" style="font-size:13px">
+                    <thead class="table-light">
+                        <tr style="white-space:nowrap">
+                            <th style="width:56px">S.No.</th>
+                            <th>
+                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold text-dark" onclick="sortCourtOrdersTable('label')">
+                                    Case No / Order link <i class="bi bi-arrow-down-up text-muted" style="font-size:10px"></i>
+                                </button>
+                            </th>
+                            <th style="width:118px">
+                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold text-dark" onclick="sortCourtOrdersTable('date')">
+                                    Date of order <i class="bi bi-arrow-down-up text-muted" style="font-size:10px"></i>
+                                </button>
+                            </th>
+                            <th class="d-none d-md-table-cell" style="min-width:140px">Judge name</th>
+                            <th style="width:64px" class="text-end"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="courtOrdersTableBody">
+                    {% for row in court_orders %}
+                    <tr data-sort-label="{{ row.sort_label_key }}" data-sort-date="{{ row.order_date|date:'Y-m-d' }}">
+                        <td class="text-muted court-co-sno">{{ forloop.counter }}</td>
+                        <td>
+                            <a href="{{ row.pdf_url }}" target="_blank" rel="noopener noreferrer" class="fw-semibold" style="color:#1d4ed8">
+                                <i class="bi bi-file-earmark-pdf me-1"></i>{{ row.link_display_text }}
+                            </a>
+                        </td>
+                        <td>{{ row.order_date|date:"d/m/Y" }}</td>
+                        <td class="d-none d-md-table-cell">{% if row.judge_name %}{{ row.judge_name }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                        <td class="text-end">
+                            {% if user.role == 'admin' or user.is_superuser or row.created_by_id == user.id %}
+                            <form method="post" action="{% url 'delete_court_order_link' case.pk row.pk %}" class="d-inline" onsubmit="return confirm('Remove this PDF link from the register?')">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Remove"><i class="bi bi-trash"></i></button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-5 border rounded" style="background:#fafafa">
+            <i class="bi bi-file-earmark-pdf text-muted" style="font-size:40px;opacity:.35"></i>
+            <p class="fw-semibold text-muted mt-2 mb-1">No order PDFs in the register yet</p>
+            <p class="text-muted small mb-0">Paste the court PDF URL above (each entry should point to a PDF file).</p>
+        </div>
+        {% endif %}
+            </div><!-- /sub-orders -->
+
+            <!-- Change Log sub-pane -->
+            <div class="tab-pane fade" id="sub-history">
+        <h5 class="mb-3" style="font-family:'Playfair Display',serif;font-weight:700;color:#0f1b35;font-size:1.1rem">
+            <i class="bi bi-journal-text me-2" style="color:#c9a84c"></i>Case history &amp; audit trail
+        </h5>
+        <div class="row">
+            <div class="col-lg-9">
+
+                {% if case_history %}
+                <!-- Filter bar -->
+                <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                    <span class="text-muted" style="font-size:12px">{{ case_history|length }} event{{ case_history|length|pluralize }}</span>
+                    <div class="ms-auto d-flex gap-1 flex-wrap" id="historyFilters">
+                        <button class="btn btn-sm filter-btn active" data-filter="all" onclick="filterHistory('all', this)" style="font-size:11px;padding:3px 10px">All</button>
+                        <button class="btn btn-sm filter-btn" data-filter="status" onclick="filterHistory('status', this)" style="font-size:11px;padding:3px 10px;background:#dbeafe;color:#1e40af;border:none">Status</button>
+                        <button class="btn btn-sm filter-btn" data-filter="edited" onclick="filterHistory('edited', this)" style="font-size:11px;padding:3px 10px;background:#f3f4f6;color:#374151;border:none">Edits</button>
+                        <button class="btn btn-sm filter-btn" data-filter="document" onclick="filterHistory('document', this)" style="font-size:11px;padding:3px 10px;background:#e0f2fe;color:#0369a1;border:none">Documents</button>
+                        <button class="btn btn-sm filter-btn" data-filter="task" onclick="filterHistory('task', this)" style="font-size:11px;padding:3px 10px;background:#dcfce7;color:#166534;border:none">Tasks</button>
+                        <button class="btn btn-sm filter-btn" data-filter="deadline" onclick="filterHistory('deadline', this)" style="font-size:11px;padding:3px 10px;background:#fef9c3;color:#854d0e;border:none">Deadlines</button>
+                        <button class="btn btn-sm filter-btn" data-filter="hearing_record" onclick="filterHistory('hearing_record', this)" style="font-size:11px;padding:3px 10px;background:#dbeafe;color:#1e3a8a;border:none">Hearings</button>
+                        <button class="btn btn-sm filter-btn" data-filter="court_order" onclick="filterHistory('court_order', this)" style="font-size:11px;padding:3px 10px;background:#fee2e2;color:#991b1b;border:none">Order PDFs</button>
+                        <button class="btn btn-sm filter-btn" data-filter="outcome" onclick="filterHistory('outcome', this)" style="font-size:11px;padding:3px 10px;background:#d1fae5;color:#065f46;border:none">Outcome</button>
+                    </div>
+                </div>
+
+                <!-- History timeline -->
+                <div class="history-timeline" id="historyTimeline">
+                {% for entry in case_history %}
+                <div class="history-entry" data-action="{{ entry.action }}">
+                    <div class="history-line"></div>
+                    <div class="history-dot" style="background:{{ entry.action_color }}">
+                        <i class="bi {{ entry.action_icon }}" style="font-size:10px;color:white"></i>
+                    </div>
+                    <div class="history-card">
+                        <div class="d-flex justify-content-between align-items-start flex-wrap gap-1">
+                            <div>
+                                <!-- Action badge -->
+                                <span class="badge me-1" style="background:{{ entry.action_color }}20;color:{{ entry.action_color }};border:1px solid {{ entry.action_color }}40;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px">
+                                    {{ entry.get_action_display }}
+                                </span>
+                                <!-- Field name if it's an edit -->
+                                {% if entry.field_name %}
+                                <span class="fw-semibold" style="font-size:13px;color:#0f1b35">{{ entry.field_name }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="text-end flex-shrink-0">
+                                <div style="font-size:12px;color:#374151">{{ entry.changed_at|date:"d M Y" }}</div>
+                                <div style="font-size:11px;color:#9ca3af">{{ entry.changed_at|date:"H:i" }}</div>
+                            </div>
+                        </div>
+
+                        <!-- Field change: show old → new -->
+                        {% if entry.old_value and entry.new_value and entry.action == 'edited' or entry.action == 'status' or entry.action == 'assigned' or entry.action == 'hearing' %}
+                        {% if entry.old_value and entry.new_value %}
+                        <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                            <span class="hist-val hist-old">{{ entry.old_value }}</span>
+                            <i class="bi bi-arrow-right" style="font-size:11px;color:#9ca3af"></i>
+                            <span class="hist-val hist-new">{{ entry.new_value }}</span>
+                        </div>
+                        {% endif %}
+                        {% elif entry.description %}
+                        <p class="mb-0 mt-1" style="font-size:13px;color:#374151">{{ entry.description }}</p>
+                        {% endif %}
+
+                        <!-- Who made the change -->
+                        <div class="mt-2" style="font-size:11px;color:#9ca3af">
+                            {% if entry.changed_by %}
+                            <i class="bi bi-person me-1"></i>{{ entry.changed_by.get_full_name|default:entry.changed_by.username }}
+                            {% else %}
+                            <i class="bi bi-robot me-1"></i>System
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                </div>
+
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-journal-text text-muted" style="font-size:40px;display:block;margin-bottom:12px;opacity:.35"></i>
+                    <p class="fw-semibold text-muted" style="font-size:14px">No history yet</p>
+                    <p class="text-muted" style="font-size:13px">Changes to this case will be automatically recorded here.</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Legend -->
+            <div class="col-lg-3 mt-3 mt-lg-0">
+                <div class="card">
+                    <div class="card-header" style="font-size:12px;font-weight:600">Legend</div>
+                    <div class="card-body p-3">
+                        <div class="d-flex flex-column gap-2" style="font-size:12px">
+                            <div class="d-flex align-items-center gap-2"><span style="width:10px;height:10px;border-radius:50%;background:#059669;flex-shrink:0"></span>Case created</div>
+                            <div class="d-flex align-items-center gap-2"><span style="width:10px;height:10px;border-radius:50%;background:#2563eb;flex-shrink:0"></span>Status change</div>
+                            <div class="d-flex align-items-center gap-2"><span style="width:10px;height:10px;border-radius:50%;background:#6b7280;flex-shrink:0"></span>Field edited</div>
+                            <div class="d-flex align-items-center gap-2"><span style="width:10px;height:10px;border-radius:50%;background:#d97706;flex-shrink:0"></span>Lawyer reassigned</div>
+                            <div class="d-flex align-items-center gap-2"><span style="width:10px;height:10px;border-radius:50%;background:#dc2626;flex-shrink:0"></span>Hearing date</div>
+                            <div class="d-flex align-items-center gap-2"><span style="width:10px;height:10px;border-radius:50%;background:#1d4ed8;flex-shrink:0"></span>Hearing record</div>
+                            <div class="d-flex align-items-center gap-2"><span style="width:10px;height:10px;border-radius:50%;background:#b91c1c;flex-shrink:0"></span>Order PDF link</div>
+                            <div class="d-flex align-items-center gap-2"><span style="width:10px;height:10px;border-radius:50%;background:#0891b2;flex-shrink:0"></span>Document event</div>
+                            <div class="d-flex align-items-center gap-2"><span style="width:10px;height:10px;border-radius:50%;background:#7c3aed;flex-shrink:0"></span>Case update</div>
+                            <div class="d-flex align-items-center gap-2"><span style="width:10px;height:10px;border-radius:50%;background:#059669;flex-shrink:0"></span>Task event</div>
+                            <div class="d-flex align-items-center gap-2"><span style="width:10px;height:10px;border-radius:50%;background:#d97706;flex-shrink:0"></span>Deadline event</div>
+                            <div class="d-flex align-items-center gap-2"><span style="width:10px;height:10px;border-radius:50%;background:#047857;flex-shrink:0"></span>Outcome recorded</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats card -->
+                {% if case_history %}
+                <div class="card mt-3">
+                    <div class="card-header" style="font-size:12px;font-weight:600">Activity Summary</div>
+                    <div class="card-body p-3">
+                        <div class="d-flex flex-column gap-2" style="font-size:12px">
+                            {% with edits=case_history|length %}
+                            <div class="d-flex justify-content-between"><span class="text-muted">Total events</span><strong>{{ edits }}</strong></div>
+                            {% endwith %}
+                            <div class="d-flex justify-content-between"><span class="text-muted">Created</span><strong>{{ case.created_at|date:"d M Y" }}</strong></div>
+                            <div class="d-flex justify-content-between"><span class="text-muted">Last change</span><strong>{{ case.updated_at|date:"d M Y" }}</strong></div>
+                            {% if case.created_by %}
+                            <div class="d-flex justify-content-between"><span class="text-muted">Created by</span><strong>{{ case.created_by.get_full_name|default:case.created_by.username|truncatechars:14 }}</strong></div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+            </div><!-- /sub-history -->
+
+        </div><!-- /tab-content -->
+
+    </div><!-- /casehistory pane -->
+
+
+
+    <!-- ── AI Analysis Tab ───────────────────────────────── -->
+    <div class="case-tab-pane" id="tab-pane-ai" style="display:none">
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card mb-3" style="border:1.5px solid #fde68a">
+                    <div class="card-header d-flex align-items-center justify-content-between" style="background:#fffbeb">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-magic" style="color:#92400e"></i>
+                            <span class="fw-semibold" style="color:#92400e">Core Summary (AI Generated)</span>
+                        </div>
+                        <button class="btn btn-sm btn-gold" onclick="openCoreSummaryModal()">
+                            <i class="bi bi-magic me-1"></i>Create summary
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-0" style="font-size:13px">
+                            Generates a structured case summary from your saved case details, hearing records, and recent updates. With <code>GEMINI_API_KEY</code> set on the server, the same flow uses Gemini to polish the draft.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4 mt-3 mt-lg-0">
+                <div class="card">
+                    <div class="card-header" style="font-size:12px;font-weight:600">What AI extracts</div>
+                    <div class="card-body p-3">
+                        <div class="d-flex flex-column gap-2" style="font-size:12px;color:#374151">
+                            <div><i class="bi bi-calendar me-2" style="color:#92400e"></i>Procedural timeline</div>
+                            <div><i class="bi bi-people me-2" style="color:#92400e"></i>Parties & status</div>
+                            <div><i class="bi bi-flag me-2" style="color:#92400e"></i>Key issues & facts (from notes)</div>
+                            <div><i class="bi bi-file-text me-2" style="color:#92400e"></i>Latest order insight (best available)</div>
+                            <div><i class="bi bi-graph-up me-2" style="color:#92400e"></i>Optional AI insights (stage/progress/risk)</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card mt-3">
+                    <div class="card-header" style="font-size:12px;font-weight:600">Previous AI analyses</div>
+                    <div class="card-body p-0" style="max-height:200px;overflow-y:auto">
+                        {% for u in updates %}
+                        {% if '[AI]' in u.title %}
+                        <div class="px-3 py-2 border-bottom">
+                            <div class="fw-semibold" style="font-size:12px;color:#5b21b6">{{ u.title }}</div>
+                            <div class="text-muted" style="font-size:11px">{{ u.date|date:"d M Y" }}</div>
+                        </div>
+                        {% endif %}
+                        {% empty %}{% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<!-- ── Core Summary Modal ─────────────────────────── -->
+<div class="modal fade" id="coreSummaryModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#fffbeb;border-bottom-color:#fde68a">
+        <div>
+          <h5 class="modal-title mb-0" style="font-family:'Playfair Display',serif;color:#92400e">
+            <i class="bi bi-magic me-2"></i>Core Summary (AI Generated)
+          </h5>
+          <p class="text-muted mb-0" style="font-size:12px">{{ case.case_number }} · {{ case.title }}</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="coreSummaryLoading" class="text-center py-4" style="display:none">
+          <div class="spinner-border" style="color:#92400e" role="status"></div>
+          <p class="mt-2 text-muted" style="font-size:13px">Generating summary…</p>
+        </div>
+        <textarea id="coreSummaryText" class="form-control" rows="16" style="font-size:13px;white-space:pre-wrap" placeholder="Click “Create summary” to generate."></textarea>
+        <div class="mt-2 text-muted" style="font-size:12px">
+          Tip: Improve extraction by adding a clear case `description` and recent `updates`.
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top-color:#fde68a">
+        <button class="btn btn-sm btn-outline-secondary" onclick="copyCoreSummary(this)">
+          <i class="bi bi-clipboard me-1"></i>Copy
+        </button>
+        <button class="btn btn-sm" style="background:#059669;color:white;border:none" onclick="saveCoreSummaryAsUpdate(this)">
+          <i class="bi bi-save me-1"></i>Save as Case Update
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── Hearing AI Assistant Modal ─────────────────────────── -->
+<div class="modal fade" id="hearingAIModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#faf5ff;border-bottom-color:#e9d5ff">
+        <div>
+          <h5 class="modal-title mb-0" style="font-family:'Playfair Display',serif;color:#5b21b6">
+            <i class="bi bi-stars me-2"></i>Hearing AI Assistant
+          </h5>
+          <p class="text-muted mb-0" id="hearingAISubtitle" style="font-size:12px"></p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <!-- Prompt chips -->
+        <div class="p-3 border-bottom" style="background:#faf5ff">
+          <div class="d-flex flex-wrap gap-2">
+            <button class="prompt-chip" onclick="runHearingPrompt('summary')">
+              <i class="bi bi-file-text me-1"></i>Make Summary
+            </button>
+            <button class="prompt-chip" onclick="runHearingPrompt('document')">
+              <i class="bi bi-file-earmark-word me-1"></i>Prepare Documents
+            </button>
+            <button class="prompt-chip" onclick="runHearingPrompt('requirements')">
+              <i class="bi bi-list-check me-1"></i>Next Hearing Requirements
+            </button>
+            <button class="prompt-chip" onclick="runHearingPrompt('arguments')">
+              <i class="bi bi-chat-square-quote me-1"></i>Prepare Arguments
+            </button>
+            <button class="prompt-chip" onclick="runHearingPrompt('risks')">
+              <i class="bi bi-exclamation-triangle me-1"></i>Risk Assessment
+            </button>
+          </div>
+        </div>
+        <!-- Custom question -->
+        <div class="p-3 border-bottom">
+          <div class="input-group">
+            <input type="text" id="hearingCustomQ" class="form-control"
+              placeholder="Ask anything about this hearing... e.g. What witnesses should I prepare?">
+            <button class="btn btn-sm" style="background:#5b21b6;color:white;border:none"
+              onclick="runHearingPrompt('custom')">
+              <i class="bi bi-send"></i>
+            </button>
+          </div>
+        </div>
+        <!-- Output area -->
+        <div class="p-4" style="min-height:200px">
+          <div id="hearingAILoading" style="display:none" class="text-center py-4">
+            <div class="spinner-border" style="color:#7c3aed" role="status"></div>
+            <p class="mt-2 text-muted" style="font-size:13px">Legi is thinking...</p>
+          </div>
+          <div id="hearingAIPlaceholder" class="text-center py-4" style="color:#9ca3af;font-size:13px">
+            <i class="bi bi-stars" style="font-size:32px;display:block;margin-bottom:8px;opacity:.4"></i>
+            Select an action above or type a custom question
+          </div>
+          <div id="hearingAIOutput" style="display:none;font-size:14px;line-height:1.75;white-space:pre-wrap;color:#1a1a2e"></div>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top-color:#e9d5ff">
+        <button class="btn btn-sm btn-outline-secondary" onclick="copyHearingOutput(this)">
+          <i class="bi bi-clipboard me-1"></i>Copy
+        </button>
+        <button class="btn btn-sm" style="background:#059669;color:white;border:none" onclick="saveHearingOutput(this)">
+          <i class="bi bi-save me-1"></i>Save as Case Update
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── Add Update Modal ────────────────────────────────────── -->
+<div class="modal fade" id="addUpdateModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" style="font-family:'Playfair Display',serif">Add Case Update</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'add_case_update' case.pk %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Date</label>
+                            {{ update_form.date }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Next Action Date</label>
+                            {{ update_form.next_action_date }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Title</label>
+                            {{ update_form.title }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Description</label>
+                            {{ update_form.description }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Order Details</label>
+                            {{ update_form.order_details }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Our Response</label>
+                            {{ update_form.filing_response }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Response Received</label>
+                            {{ update_form.response_received }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Internal Note</label>
+                            {{ update_form.internal_notes }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Related Document</label>
+                            {{ update_form.related_document }}
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-navy">Add Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ── Upload Document Modal ──────────────────────────────── -->
+<div class="modal fade" id="uploadDocModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" style="font-family:'Playfair Display',serif">Upload Document</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'upload_document' case.pk %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Title (optional)</label>
+                        {{ document_form.title }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Document Type</label>
+                        {{ document_form.document_type }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Folder</label>
+                        {{ document_form.folder }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Tags</label>
+                        {{ document_form.tags }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">File</label>
+                        {{ document_form.file }}
+                        <div class="form-text">PDF, DOC, DOCX, JPG, PNG — max 10MB</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Notes</label>
+                        {{ document_form.notes }}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-navy">Upload</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Fix sub-tab pill active styles to match our navy theme
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('#caseHistorySubTabs .nav-link').forEach(function(link) {
+        link.addEventListener('shown.bs.tab', function() {
+            document.querySelectorAll('#caseHistorySubTabs .nav-link').forEach(function(l) {
+                if (l.classList.contains('active')) {
+                    l.style.background = '#0f1b35';
+                    l.style.color = 'white';
+                    l.querySelector('.badge') && (l.querySelector('.badge').style.background = 'rgba(255,255,255,0.2)');
+                    l.querySelector('.badge') && (l.querySelector('.badge').style.color = 'white');
+                } else {
+                    l.style.background = '#f3f4f6';
+                    l.style.color = '#374151';
+                    l.querySelector('.badge') && (l.querySelector('.badge').style.background = '#e5e7eb');
+                    l.querySelector('.badge') && (l.querySelector('.badge').style.color = '#6b7280');
+                }
+            });
+        });
+    });
+});
+</script>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Activate correct tab if URL hash present
+document.addEventListener('DOMContentLoaded', function() {
+    const hash = window.location.hash;
+    if (hash) {
+        const tabEl = document.querySelector(`[href="${hash}"]`);
+        if (tabEl) new bootstrap.Tab(tabEl).show();
+    }
+});
+// ── Core Summary (AI Generated) ───────────────────────────────
+const CASE_PK = {{ case.pk }};
+
+let _courtOrderSort = { date: 'desc', label: 'asc' };
+
+function sortCourtOrdersTable(by) {
+    const tbody = document.getElementById('courtOrdersTableBody');
+    if (!tbody) return;
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const cur = _courtOrderSort[by] || 'asc';
+    const dir = cur === 'asc' ? 'desc' : 'asc';
+    _courtOrderSort[by] = dir;
+    const mul = dir === 'asc' ? 1 : -1;
+    rows.sort(function(a, b) {
+        if (by === 'date') {
+            const va = a.getAttribute('data-sort-date') || '';
+            const vb = b.getAttribute('data-sort-date') || '';
+            if (va < vb) return -mul;
+            if (va > vb) return mul;
+            return 0;
+        }
+        const va = (a.getAttribute('data-sort-label') || '');
+        const vb = (b.getAttribute('data-sort-label') || '');
+        return va.localeCompare(vb, undefined, { sensitivity: 'base' }) * mul;
+    });
+    rows.forEach(function(r) { tbody.appendChild(r); });
+    tbody.querySelectorAll('.court-co-sno').forEach(function(td, i) { td.textContent = String(i + 1); });
+}
+
+let _coreSummaryModal;
+
+function openCoreSummaryModal() {
+    const el = document.getElementById('coreSummaryModal');
+    _coreSummaryModal = _coreSummaryModal || new bootstrap.Modal(el);
+    _coreSummaryModal.show();
+    generateCoreSummary();
+}
+
+async function generateCoreSummary() {
+    const loading = document.getElementById('coreSummaryLoading');
+    const txt = document.getElementById('coreSummaryText');
+    loading.style.display = 'block';
+    try {
+        let res = await fetch(`/cases/${CASE_PK}/gemini/core-summary/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+            body: JSON.stringify({})
+        });
+        let data = await res.json();
+        if (!data.ok || data.skipped) {
+            res = await fetch(`/cases/${CASE_PK}/core-summary/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                body: JSON.stringify({})
+            });
+            data = await res.json();
+        }
+        if (data.ok) {
+            txt.value = data.summary || '';
+            window._lastCoreSummary = txt.value;
+        } else {
+            txt.value = (data.error || 'Failed to generate summary.');
+        }
+    } catch (e) {
+        txt.value = 'Failed to generate summary (network error).';
+    } finally {
+        loading.style.display = 'none';
+    }
+}
+
+function copyCoreSummary(btn) {
+    const txt = document.getElementById('coreSummaryText').value || '';
+    navigator.clipboard.writeText(txt);
+    if (btn) {
+        const old = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check me-1"></i>Copied!';
+        setTimeout(() => { btn.innerHTML = old; }, 1200);
+    }
+}
+
+async function saveCoreSummaryAsUpdate(btn) {
+    const summary = (document.getElementById('coreSummaryText').value || '').trim();
+    if (!summary) return;
+    btn.disabled = true; btn.textContent = 'Saving...';
+    try {
+        const res = await fetch(`/cases/${CASE_PK}/ai-summary/save/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+            body: JSON.stringify({ summary, title: 'Core Summary' })
+        });
+        const data = await res.json();
+        btn.disabled = false;
+        btn.innerHTML = data.ok ? '<i class="bi bi-check me-1"></i>Saved!' : '<i class="bi bi-save me-1"></i>Save as Case Update';
+        if (data.ok) setTimeout(() => location.reload(), 800);
+    } catch (e) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-save me-1"></i>Save as Case Update';
+    }
+}
+
+function getCsrfToken() {
+    const m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+}
+
+// ── History tab filter ──────────────────────────────────────
+function filterHistory(type, btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.history-entry').forEach(entry => {
+        if (type === 'all') {
+            entry.style.display = '';
+        } else {
+            entry.style.display = entry.dataset.action === type ? '' : 'none';
+        }
+    });
+    // Hide lines for hidden entries
+    document.querySelectorAll('.history-entry').forEach(entry => {
+        const line = entry.querySelector('.history-line');
+        if (line) {
+            const isVisible = entry.style.display !== 'none';
+            line.style.display = isVisible ? '' : 'none';
+        }
+    });
+}
+
+// ── Hearing AI Assistant ──────────────────────────────────────
+let _hearingCtx = {};
+
+function openHearingAI(pk, purpose, dateStr, judgeName, notes, scraped) {
+    _hearingCtx = { pk, purpose, dateStr, judgeName: judgeName || '', notes, scraped };
+    const judgeBit = (judgeName && String(judgeName).trim()) ? (' · ' + judgeName) : '';
+    document.getElementById('hearingAISubtitle').textContent = dateStr + ' · ' + purpose + judgeBit;
+    document.getElementById('hearingAIOutput').style.display    = 'none';
+    document.getElementById('hearingAILoading').style.display   = 'none';
+    document.getElementById('hearingAIPlaceholder').style.display = 'block';
+    new bootstrap.Modal(document.getElementById('hearingAIModal')).show();
+}
+
+const HEARING_PROMPTS = {
+    summary:      `Provide a concise professional summary of this hearing. Include: what was discussed, orders passed, parties' positions, and what it means for the case going forward.`,
+    document:     `List all documents that should be prepared or filed before the next hearing. Be specific — include names of applications, affidavits, submissions, and supporting evidence. Format as a numbered checklist.`,
+    requirements: `What are the specific legal requirements and preparations needed for the next hearing date? Include: procedural steps, documents to file, arguments to prepare, witnesses if any, and any court fee payments.`,
+    arguments:    `Draft the key legal arguments to be made at the next hearing. Structure them with the main contention first, supported by legal provisions, precedents, and facts from the case.`,
+    risks:        `Identify the top 3-5 risks or adverse scenarios for our client at the next hearing. For each risk, suggest a mitigation strategy.`,
+    custom:       null,
+};
+
+function _hearingDeterministicOutput(type, taskPrompt, context, notes, scraped) {
+    let output = '';
+    if (type === 'summary') {
+        output =
+`Hearing Summary
+
+- Date: ${_hearingCtx.dateStr}
+- Purpose: ${_hearingCtx.purpose}
+- Judge / bench: ${(_hearingCtx.judgeName || '').trim() || '—'}
+- Notes (recorded): ${notes || '—'}
+${scraped ? `\nCourt record excerpt:\n${scraped}` : ''}`.trim();
+    } else if (type === 'document') {
+        output =
+`Before next hearing, consider preparing:
+1) Updated vakalatnama/authorisation (if required)
+2) Compilation of documents + index
+3) Brief written submissions (if applicable)
+4) Affidavit(s) supporting the key facts
+5) Annexures / exhibits properly paginated
+
+Context:
+${context}`.trim();
+    } else if (type === 'requirements') {
+        output =
+`Next hearing preparation checklist:
+- Confirm next date and cause list listing
+- Review last order / directions (if any) from notes
+- Keep copies of filed pleadings + annexures
+- Prepare a short oral brief + 1-page chronology
+
+Context:
+${context}`.trim();
+    } else if (type === 'arguments') {
+        output =
+`Argument outline (draft):
+1) Facts: (extract from case file / hearing notes)
+2) Relief sought: (as per petition/application)
+3) Key legal points: (add statutes/precedents you rely on)
+4) Anticipated objections and responses
+
+Context:
+${context}`.trim();
+    } else if (type === 'risks') {
+        output =
+`Top risks to plan for:
+1) Adverse interim direction due to non-compliance with prior order
+2) Adjournment risk due to missing documents / service defects
+3) Weak factual record if supporting documents are not filed
+
+Mitigation:
+- Verify compliance, file missing documents early, keep proof of service.
+
+Context:
+${context}`.trim();
+    } else {
+        output =
+`Answer (based on saved notes)
+
+Question: ${taskPrompt}
+Notes: ${notes || '—'}
+${scraped ? `\nCourt record excerpt:\n${scraped}` : ''}`.trim();
+    }
+    return output;
+}
+
+async function runHearingPrompt(type) {
+    const case_info = {
+        case_number: '{{ case.case_number }}',
+        title:       '{{ case.title|escapejs }}',
+        court:       '{{ case.court_name|escapejs }}',
+        case_type:   '{{ case.get_case_type_display }}',
+        petitioner:  '{{ case.petitioner|escapejs }}',
+        respondent:  '{{ case.respondent|escapejs }}',
+    };
+
+    let taskPrompt = HEARING_PROMPTS[type];
+    if (type === 'custom') {
+        taskPrompt = document.getElementById('hearingCustomQ').value.trim();
+        if (!taskPrompt) return;
+    }
+
+    const context = `
+Case: ${case_info.title} (${case_info.case_number})
+Court: ${case_info.court}
+Type: ${case_info.case_type}
+Parties: ${case_info.petitioner} vs ${case_info.respondent}
+Hearing Date: ${_hearingCtx.dateStr}
+Purpose: ${_hearingCtx.purpose}
+Judge / bench: ${(_hearingCtx.judgeName || '').trim() || '—'}
+${_hearingCtx.notes ? 'Hearing Notes: ' + _hearingCtx.notes : ''}
+${_hearingCtx.scraped ? 'Court Record Excerpt:\n' + _hearingCtx.scraped : ''}
+    `.trim();
+
+    document.getElementById('hearingAIPlaceholder').style.display = 'none';
+    document.getElementById('hearingAIOutput').style.display      = 'none';
+    document.getElementById('hearingAILoading').style.display     = 'block';
+
+    const notes = (_hearingCtx.notes || '').trim();
+    const scraped = (_hearingCtx.scraped || '').trim();
+
+    let output = '';
+    try {
+        const res = await fetch(`/cases/${CASE_PK}/gemini/hearing-assist/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+            body: JSON.stringify({
+                mode: type,
+                custom_question: type === 'custom' ? taskPrompt : '',
+                hearing_date: _hearingCtx.dateStr || '',
+                purpose: _hearingCtx.purpose || '',
+                judge_name: (_hearingCtx.judgeName || '').trim(),
+                notes,
+                scraped,
+            }),
+        });
+        const data = await res.json();
+        if (data.ok && data.text) {
+            output = data.text;
+        }
+    } catch (e) { /* fall through */ }
+
+    if (!output) {
+        output = _hearingDeterministicOutput(type, taskPrompt, context, notes, scraped);
+    }
+
+    document.getElementById('hearingAILoading').style.display  = 'none';
+    document.getElementById('hearingAIOutput').style.display   = 'block';
+    document.getElementById('hearingAIOutput').textContent = output;
+    window._lastHearingOutput = output;
+    window._lastHearingType   = type;
+}
+
+function copyHearingOutput(btn) {
+    navigator.clipboard.writeText(window._lastHearingOutput || '').then(() => {
+        if (btn) {
+            btn.innerHTML = '<i class="bi bi-check me-1"></i>Copied!';
+            setTimeout(() => btn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy', 2000);
+        }
+    });
+}
+
+async function saveHearingOutput(btn) {
+    if (!window._lastHearingOutput) return;
+    btn.disabled = true; btn.textContent = 'Saving...';
+    const res = await fetch(`/cases/{{ case.pk }}/ai-summary/save/`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-CSRFToken': getCsrfToken()},
+        body: JSON.stringify({ summary: window._lastHearingOutput, title: 'Hearing AI: ' + (window._lastHearingType || 'Analysis') })
+    });
+    const d = await res.json();
+    btn.disabled = false;
+    btn.innerHTML = d.ok ? '<i class="bi bi-check me-1"></i>Saved!' : 'Save as Case Update';
+    if (d.ok) btn.style.background = '#059669';
+}
+
+function scrapeRecord(recPk) {
+    if (!confirm('Fetch data from the court URL for this record?')) return;
+    fetch(`/cases/{{ case.pk }}/hearings/${recPk}/scrape/`, {
+        method: 'POST', headers: { 'X-CSRFToken': getCsrfToken() }
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.ok) { alert('Data fetched! Refresh to see it.'); location.reload(); }
+        else alert('Fetch failed: ' + d.error);
+    });
+}
+
+function initPdfExtractUI() {
+    const sourceEl = document.getElementById('pdfExtractSourceType');
+    if (!sourceEl) return;
+    const docWrap = document.getElementById('pdfExtractDocWrap');
+    const urlWrap = document.getElementById('pdfExtractUrlWrap');
+    function sync() {
+        const isDoc = sourceEl.value === 'document';
+        docWrap.style.display = isDoc ? '' : 'none';
+        urlWrap.style.display = isDoc ? 'none' : '';
+    }
+    sourceEl.addEventListener('change', sync);
+    sync();
+}
+
+async function extractPdfTimeline() {
+    const status = document.getElementById('pdfExtractStatus');
+    const sourceType = document.getElementById('pdfExtractSourceType').value;
+    const documentId = document.getElementById('pdfExtractDocId').value;
+    const pdfUrl = (document.getElementById('pdfExtractUrl').value || '').trim();
+    const includeTimeline = document.getElementById('pdfIncludeTimeline').checked;
+    const includeSummary = document.getElementById('pdfIncludeSummary').checked;
+
+    if (sourceType === 'document' && !documentId) {
+        status.textContent = 'Please select a PDF document first.';
+        return;
+    }
+    if (sourceType === 'url' && !pdfUrl) {
+        status.textContent = 'Please enter a PDF URL first.';
+        return;
+    }
+
+    status.textContent = 'Extracting PDF data...';
+    let docPk = null;
+    if (sourceType === 'document' && documentId && /^\d+$/.test(String(documentId))) {
+        docPk = parseInt(documentId, 10);
+    }
+    try {
+        const res = await fetch(`/cases/${CASE_PK}/timeline/extract-pdf/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+            body: JSON.stringify({
+                source_type: sourceType,
+                document_id: docPk,
+                pdf_url: pdfUrl,
+                include_timeline: includeTimeline,
+                include_summary: includeSummary,
+            }),
+        });
+        let data = {};
+        try {
+            data = await res.json();
+        } catch (parseErr) {
+            status.textContent = `Request failed (${res.status}). Try again or check the server log.`;
+            return;
+        }
+        if (!data.ok) {
+            status.textContent = data.error || `Extraction failed (${res.status}).`;
+            return;
+        }
+        status.textContent = `Done. ${data.created_updates || 0} update(s) created. Refreshing...`;
+        setTimeout(() => location.reload(), 900);
+    } catch (e) {
+        status.textContent = 'Extraction failed (network error).';
+    }
+}
+
+function getCsrfToken() {
+    const m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+}
+
+initPdfExtractUI();
+
+</script>
+{% endblock %}

@@ -1,0 +1,369 @@
+{% extends 'base.html' %}
+{% block title %}Manage Documents{% endblock %}
+{% block page_title %}Manage Documents{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-3">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-search me-1"></i>Find Documents</div>
+            <div class="card-body">
+                <form method="get" class="row g-2">
+                    <div class="col-md-5">
+                        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Search title, case no., notes...">
+                    </div>
+                    <div class="col-md-3">
+                        <select name="case" class="form-select">
+                            <option value="">All Cases</option>
+                            {% for c in cases_for_select %}
+                            <option value="{{ c.pk }}" {% if selected_case == c.pk|stringformat:"s" %}selected{% endif %}>
+                                {{ c.case_number }} - {{ c.title|truncatechars:25 }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select name="document_type" class="form-select">
+                            <option value="">All Types</option>
+                            {% for val, label in document_type_choices %}
+                            <option value="{{ val }}" {% if selected_document_type == val %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-grid">
+                        <button class="btn btn-navy" type="submit">Filter</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header"><i class="bi bi-files me-1"></i>Bulk Upload (Case Documents)</div>
+            <div class="card-body">
+                <form method="post" action="{% url 'bulk_upload_case_documents' %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-2"><label class="form-label" style="font-size:12px">Case</label>{{ bulk_upload_form.case }}</div>
+                    <div class="mb-2"><label class="form-label" style="font-size:12px">Existing Folder</label>{{ bulk_upload_form.existing_folder }}</div>
+                    <div class="mb-2"><label class="form-label" style="font-size:12px">Create New Folder</label>{{ bulk_upload_form.custom_folder }}</div>
+                    <div class="mb-2"><label class="form-label" style="font-size:12px">Document Type</label>{{ bulk_upload_form.document_type }}</div>
+                    <div class="mb-2"><label class="form-label" style="font-size:12px">Title Prefix</label>{{ bulk_upload_form.title_prefix }}</div>
+                    <div class="mb-2"><label class="form-label" style="font-size:12px">Tags</label>{{ bulk_upload_form.tags }}</div>
+                    <div class="mb-2"><label class="form-label" style="font-size:12px">Common Note</label>{{ bulk_upload_form.notes }}</div>
+                    <div class="mb-2">
+                        <label class="form-label" style="font-size:12px">Select Multiple Files</label>
+                        <div id="dropZone" class="border rounded p-3 text-center text-muted mb-2" style="border-style:dashed!important;cursor:pointer">
+                            Drag and drop files here, or click to select
+                        </div>
+                        {{ bulk_upload_form.files }}
+                    </div>
+                    <button class="btn btn-gold w-100" type="submit"><i class="bi bi-upload me-1"></i>Upload Bulk Files</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-folder2-open me-1"></i>Case Documents</span>
+        <span class="text-muted" style="font-size:12px">{{ documents|length }} items</span>
+    </div>
+    <div class="card-body border-bottom">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <div class="text-muted" style="font-size:12px;font-weight:600">Cases:</div>
+            <div class="d-flex gap-1 flex-wrap">
+                {% for c in cases_for_select %}
+                    <a class="btn btn-sm {% if nav_case == c.pk|stringformat:'s' %}btn-navy{% else %}btn-outline-secondary{% endif %}"
+                       href="?nav_case={{ c.pk }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if selected_document_type %}&document_type={{ selected_document_type|urlencode }}{% endif %}"
+                       style="font-size:12px">
+                        {{ c.case_number }}
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% if not nav_case %}
+            <div class="text-muted mt-2" style="font-size:12px">Click a case to view its folders and files.</div>
+        {% endif %}
+    </div>
+    <div class="card-body border-bottom">
+        <form method="post" action="{% url 'bulk_case_document_actions' %}" id="bulkDocForm" class="d-flex gap-2 flex-wrap align-items-center">
+            {% csrf_token %}
+            <button class="btn btn-sm btn-outline-secondary" type="button" onclick="toggleAllDocs(true)">Select All</button>
+            <button class="btn btn-sm btn-outline-secondary" type="button" onclick="toggleAllDocs(false)">Clear</button>
+            <button class="btn btn-sm btn-outline-dark" type="submit" name="action" value="download">
+                <i class="bi bi-file-earmark-zip me-1"></i>Download Selected ZIP
+            </button>
+            <button class="btn btn-sm btn-outline-danger" type="submit" name="action" value="delete"
+                    onclick="return confirm('Delete selected documents?')">
+                <i class="bi bi-trash me-1"></i>Delete Selected
+            </button>
+            <span class="text-muted ms-auto" style="font-size:12px" id="selectedCountText">0 selected</span>
+        </form>
+    </div>
+    <div class="card-body">
+        {% if nav_case and documents_by_folder %}
+            <div class="accordion" id="caseDocsAccordion">
+                {% for folder_name, folder_docs in documents_by_folder %}
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="caseDocsHead-{{ forloop.counter }}">
+                        <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#caseDocsCollapse-{{ forloop.counter }}">
+                            <i class="bi bi-folder2-open me-2"></i>{{ folder_name }}
+                            <span class="badge bg-light text-dark border ms-2">{{ folder_docs|length }}</span>
+                        </button>
+                    </h2>
+                    <div id="caseDocsCollapse-{{ forloop.counter }}"
+                         class="accordion-collapse collapse {% if forloop.first %}show{% endif %}">
+                        <div class="accordion-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th style="width:34px"></th>
+                                            <th>Document</th>
+                                            <th>Case</th>
+                                            <th>Type</th>
+                                            <th>Folder/Tags</th>
+                                            <th>Uploaded</th>
+                                            <th style="width:135px">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for d in folder_docs %}
+                                        <tr>
+                                            <td>
+                                                <input type="checkbox" class="form-check-input doc-check"
+                                                       name="selected_docs" value="{{ d.pk }}"
+                                                       form="bulkDocForm" onchange="refreshSelectedCount()">
+                                            </td>
+                                            <td>
+                                                <div class="fw-semibold">{{ d.title|default:d.filename }}</div>
+                                                <div class="text-muted" style="font-size:11px">{{ d.filename }}</div>
+                                            </td>
+                                            <td>
+                                                <a href="{% url 'case_detail' d.case.pk %}" class="text-decoration-none">{{ d.case.case_number }}</a>
+                                                <div class="text-muted" style="font-size:11px">{{ d.case.title|truncatechars:30 }}</div>
+                                            </td>
+                                            <td><span class="badge bg-light text-dark border" style="font-size:10px">{{ d.get_document_type_display }}</span></td>
+                                            <td style="font-size:12px">
+                                                <div>{{ d.folder|default:"—" }}</div>
+                                                {% if d.tags %}<div class="text-muted">{{ d.tags }}</div>{% endif %}
+                                            </td>
+                                            <td style="font-size:12px">
+                                                {{ d.uploaded_at|date:"d M Y, h:i A" }}<br>
+                                                <span class="text-muted">{{ d.uploaded_by.get_full_name|default:d.uploaded_by.username|default:"—" }}</span>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex gap-1">
+                                                    <a class="btn btn-sm btn-outline-secondary" href="{% url 'download_document' d.pk %}" title="Download">
+                                                        <i class="bi bi-download"></i>
+                                                    </a>
+                                                    {% if d.is_pdf %}
+                                                    <a class="btn btn-sm btn-outline-primary" href="{{ d.file.url }}" target="_blank" title="Preview">
+                                                        <i class="bi bi-eye"></i>
+                                                    </a>
+                                                    {% endif %}
+                                                </div>
+                                                {% if user.role == 'admin' or user.is_superuser or d.uploaded_by == user %}
+                                                    <form method="post" action="{% url 'delete_case_document_from_manager' d.pk %}" onsubmit="return confirm('Delete this document?')" class="mt-2">
+                                                        {% csrf_token %}
+                                                        <button class="btn btn-sm btn-outline-danger w-100" type="submit" style="font-size:12px">
+                                                            <i class="bi bi-trash me-1"></i>Delete
+                                                        </button>
+                                                    </form>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center text-muted py-4">No documents found.</div>
+                {% endfor %}
+            </div>
+        {% elif nav_case %}
+            <div class="text-center text-muted py-4">No documents found for this case.</div>
+        {% else %}
+            <div class="text-center text-muted py-4">Select a case to view documents.</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-archive me-1"></i>Add Offline Document</div>
+            <div class="card-body">
+                <form method="post" action="{% url 'add_offline_document' %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-2"><label class="form-label" style="font-size:12px">Case (optional)</label>{{ offline_form.case }}</div>
+                    <div class="mb-2"><label class="form-label" style="font-size:12px">Title *</label>{{ offline_form.title }}</div>
+                    <div class="mb-2"><label class="form-label" style="font-size:12px">Folder</label>{{ offline_form.folder }}</div>
+                    <div class="mb-2"><label class="form-label" style="font-size:12px">Tags</label>{{ offline_form.tags }}</div>
+                    <div class="mb-2"><label class="form-label" style="font-size:12px">Physical Storage Location</label>{{ offline_form.storage_location }}</div>
+                    <div class="mb-2"><label class="form-label" style="font-size:12px">Attach Digital Copy (optional)</label>{{ offline_form.file }}</div>
+                    <div class="mb-2"><label class="form-label" style="font-size:12px">Notes</label>{{ offline_form.notes }}</div>
+                    <button class="btn btn-navy w-100" type="submit"><i class="bi bi-save me-1"></i>Save Offline Entry</button>
+                </form>
+                <hr>
+                <form method="post" action="{% url 'import_offline_documents_csv' %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <label class="form-label" style="font-size:12px">Import Offline Records via CSV</label>
+                    <input class="form-control mb-2" type="file" name="csv_file" accept=".csv" required>
+                    <div class="text-muted mb-2" style="font-size:11px">Columns: title, case_number, folder, tags, storage_location, notes</div>
+                    <button class="btn btn-outline-secondary w-100" type="submit"><i class="bi bi-filetype-csv me-1"></i>Import CSV</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-hdd-stack me-1"></i>Offline Document Register</span>
+                <span class="text-muted" style="font-size:12px">{{ offline_documents|length }} items</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Case</th>
+                            <th>Folder/Tags</th>
+                            <th>Storage</th>
+                            <th>Digital Copy</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for o in offline_documents %}
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">{{ o.title }}</div>
+                                {% if o.notes %}<div class="text-muted" style="font-size:11px">{{ o.notes|truncatechars:55 }}</div>{% endif %}
+                            </td>
+                            <td>
+                                {% if o.case %}
+                                <a href="{% url 'case_detail' o.case.pk %}" class="text-decoration-none">{{ o.case.case_number }}</a>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td style="font-size:12px">
+                                <div>{{ o.folder|default:"—" }}</div>
+                                {% if o.tags %}<div class="text-muted">{{ o.tags }}</div>{% endif %}
+                            </td>
+                            <td style="font-size:12px">{{ o.storage_location|default:"—" }}</td>
+                            <td>
+                                {% if o.file %}
+                                <span class="badge bg-success-subtle text-success border">{{ o.filename|truncatechars:25 }}</span>
+                                {% else %}
+                                <span class="text-muted">No file</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="d-flex gap-1">
+                                    {% if o.file %}
+                                    <a class="btn btn-sm btn-outline-secondary" href="{% url 'download_offline_document' o.pk %}"><i class="bi bi-download"></i></a>
+                                    {% endif %}
+                                    <form method="post" action="{% url 'delete_offline_document' o.pk %}" onsubmit="return confirm('Delete this offline entry?')">
+                                        {% csrf_token %}
+                                        <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="text-center text-muted py-4">No offline documents recorded.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ case_folders_map|json_script:"case-folders-map" }}
+<script>
+(() => {
+    const caseFoldersMap = JSON.parse(document.getElementById('case-folders-map').textContent || '{}');
+    const fileInput = document.getElementById('id_files');
+    const dropZone = document.getElementById('dropZone');
+    const caseSelect = document.getElementById('id_case');
+    const existingFolderSelect = document.getElementById('id_existing_folder');
+    const customFolderInput = document.getElementById('id_custom_folder');
+    if (!fileInput || !dropZone) return;
+    fileInput.style.display = 'none';
+    dropZone.addEventListener('click', () => fileInput.click());
+    ['dragenter', 'dragover'].forEach(evt => dropZone.addEventListener(evt, e => {
+        e.preventDefault();
+        dropZone.classList.add('bg-light');
+    }));
+    ['dragleave', 'drop'].forEach(evt => dropZone.addEventListener(evt, e => {
+        e.preventDefault();
+        dropZone.classList.remove('bg-light');
+    }));
+    dropZone.addEventListener('drop', e => {
+        if (!e.dataTransfer.files?.length) return;
+        fileInput.files = e.dataTransfer.files;
+        dropZone.textContent = `${e.dataTransfer.files.length} file(s) selected`;
+    });
+    fileInput.addEventListener('change', () => {
+        const count = fileInput.files?.length || 0;
+        dropZone.textContent = count ? `${count} file(s) selected` : 'Drag and drop files here, or click to select';
+    });
+
+    function refreshFolderOptions() {
+        if (!caseSelect || !existingFolderSelect) return;
+        const caseId = caseSelect.value || '';
+        const folders = caseFoldersMap[caseId] || [];
+        existingFolderSelect.innerHTML = '';
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = 'Select existing folder (optional)';
+        existingFolderSelect.appendChild(defaultOpt);
+        folders.forEach(folderName => {
+            const opt = document.createElement('option');
+            opt.value = folderName;
+            opt.textContent = folderName;
+            existingFolderSelect.appendChild(opt);
+        });
+        if (customFolderInput && customFolderInput.value.trim()) {
+            existingFolderSelect.value = '';
+        }
+    }
+
+    if (caseSelect && existingFolderSelect) {
+        caseSelect.addEventListener('change', refreshFolderOptions);
+        customFolderInput?.addEventListener('input', () => {
+            if (customFolderInput.value.trim()) existingFolderSelect.value = '';
+        });
+        existingFolderSelect.addEventListener('change', () => {
+            if (existingFolderSelect.value) customFolderInput.value = '';
+        });
+        refreshFolderOptions();
+    }
+})();
+
+function toggleFolder(slug) {
+    document.querySelectorAll(`.folder-${slug}`).forEach(row => {
+        row.style.display = row.style.display === 'none' ? '' : 'none';
+    });
+}
+
+function toggleAllDocs(checked) {
+    document.querySelectorAll('.doc-check').forEach(cb => cb.checked = checked);
+    refreshSelectedCount();
+}
+
+function refreshSelectedCount() {
+    const count = document.querySelectorAll('.doc-check:checked').length;
+    const el = document.getElementById('selectedCountText');
+    if (el) el.textContent = `${count} selected`;
+}
+</script>
+{% endblock %}

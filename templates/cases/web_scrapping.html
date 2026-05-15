@@ -1,0 +1,316 @@
+{% extends 'base.html' %}
+{% block title %}Web Scrapping{% endblock %}
+{% block page_title %}Web Scrapping{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-lg-5">
+    <div class="card mb-3">
+      <div class="card-header">Scrap Court Website</div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="scrape">
+          <div class="mb-3">
+            <label class="form-label fw-semibold" style="font-size:13px">Court URL</label>
+            <input type="text" name="target_url" class="form-control"
+                   value="{{ target_url }}"
+                   placeholder="https://ecourts.gov.in/...">
+            <div class="form-text">Paste a public court page URL to extract details and PDF links.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold" style="font-size:13px">Attach import to case (optional)</label>
+            <select name="case_id" class="form-select">
+              <option value="">-- Select case --</option>
+              {% for c in cases %}
+              <option value="{{ c.pk }}" {% if selected_case_id|stringformat:"s" == c.pk|stringformat:"s" %}selected{% endif %}>
+                {{ c.case_number }} - {{ c.title|truncatechars:45 }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold" style="font-size:13px">Site Profile</label>
+            <select name="profile" class="form-select">
+              {% for key, p in profiles.items %}
+              <option value="{{ key }}" {% if options.profile == key %}selected{% endif %}>{{ p.label }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Use profile presets for portals with different structures.</div>
+          </div>
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label fw-semibold" style="font-size:12px">Timeout (sec)</label>
+              <input type="number" min="5" max="90" name="timeout_sec" class="form-control" value="{{ options.timeout_sec|default:20 }}">
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold" style="font-size:12px">Custom User-Agent</label>
+              <input type="text" name="user_agent" class="form-control" value="{{ options.user_agent }}" placeholder="Optional">
+            </div>
+          </div>
+          <div class="mt-3">
+            <label class="form-label fw-semibold" style="font-size:12px">Page text extraction mode</label>
+            <select name="extract_mode" class="form-select">
+              <option value="text" {% if options.extract_mode == 'text' %}selected{% endif %}>Text extraction (HTML page)</option>
+              <option value="ocr" {% if options.extract_mode == 'ocr' %}selected{% endif %}>OCR (image URLs only)</option>
+              <option value="both" {% if options.extract_mode == 'both' %}selected{% endif %}>Page text + OCR</option>
+            </select>
+            <div class="form-text">Applies to the court <em>page</em> URL above, not to PDF files.</div>
+          </div>
+          <div class="mt-3 d-flex flex-column gap-2">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="follow_embeds" name="follow_embeds" {% if options.follow_embeds %}checked{% endif %}>
+              <label class="form-check-label" for="follow_embeds" style="font-size:13px">Follow iframe/object/embed links</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="verify_ssl" name="verify_ssl" {% if options.verify_ssl %}checked{% endif %}>
+              <label class="form-check-label" for="verify_ssl" style="font-size:13px">Verify SSL certificate</label>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-navy w-100 mt-3">Fetch Data</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card mb-3 border-primary" style="border-width:2px">
+      <div class="card-header bg-primary text-white"><i class="bi bi-file-earmark-pdf me-1"></i> Extract PDF text (direct URL)</div>
+      <div class="card-body">
+        <p class="text-muted mb-2" style="font-size:13px">Paste a <strong>direct</strong> link to a PDF (must start with <code>http</code> and return a file). No court page scrape required.</p>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="extract_pdf_direct">
+          <div class="mb-2">
+            <label class="form-label fw-semibold" style="font-size:12px">PDF URL</label>
+            <input type="url" name="pdf_direct_url" class="form-control" value="{{ pdf_direct_url }}"
+                   placeholder="https://…/order.pdf">
+          </div>
+          <div class="row g-2 mb-2">
+            <div class="col-6">
+              <label class="form-label fw-semibold" style="font-size:11px">Timeout (sec)</label>
+              <input type="number" min="10" max="120" name="timeout_sec_pdf" class="form-control form-control-sm"
+                     value="{% if pdf_fetch_options %}{{ pdf_fetch_options.timeout_sec }}{% else %}35{% endif %}">
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold" style="font-size:11px">User-Agent</label>
+              <input type="text" name="user_agent_pdf" class="form-control form-control-sm" placeholder="Optional"
+                     value="{% if pdf_fetch_options %}{{ pdf_fetch_options.user_agent }}{% endif %}">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold" style="font-size:11px">SSL</label>
+            <select name="verify_ssl_pdf" class="form-select form-select-sm">
+              <option value="1" {% if not pdf_fetch_options or pdf_fetch_options.verify_ssl %}selected{% endif %}>Verify SSL (recommended)</option>
+              <option value="0" {% if pdf_fetch_options and not pdf_fetch_options.verify_ssl %}selected{% endif %}>Skip SSL verify (only if download fails)</option>
+            </select>
+          </div>
+          <button type="submit" class="btn w-100 text-white" style="background:#1d4ed8">
+            <i class="bi bi-file-text me-1"></i> Extract PDF text
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">How It Works</div>
+      <div class="card-body">
+        <ol class="mb-0" style="font-size:13px;color:#374151;line-height:1.8">
+          <li><strong>Fetch Data</strong> — extracts text from the HTML page and lists PDF links.</li>
+          <li><strong>Extract PDF text (direct URL)</strong> — downloads a PDF and shows selectable text (left card).</li>
+          <li>After a fetch, tick PDFs and click <strong>Extract PDF text</strong> to read those files.</li>
+          <li>Or tick PDFs and <strong>Import into case</strong> to save them as documents.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7 mt-3 mt-lg-0">
+
+    {% if standalone_pdf_extraction %}
+    <div class="card mb-3 border-success" style="border-width:2px">
+      <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2" style="background:#ecfdf5">
+        <span class="fw-semibold"><i class="bi bi-check2-circle me-1 text-success"></i> PDF text (direct URL)</span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyPdfBlock('standalonePdfText')">
+          <i class="bi bi-clipboard me-1"></i> Copy all
+        </button>
+      </div>
+      <div class="card-body">
+        <div class="text-muted mb-2" style="font-size:12px;word-break:break-all">{{ standalone_pdf_extraction.url }}</div>
+        {% if standalone_pdf_extraction.error and not standalone_pdf_extraction.ok %}
+        <div class="alert alert-warning py-2 mb-2" style="font-size:13px">{{ standalone_pdf_extraction.error }}</div>
+        {% endif %}
+        {% if standalone_pdf_extraction.text %}
+        <textarea id="standalonePdfText" class="form-control" rows="14" readonly style="font-size:13px;white-space:pre-wrap">{{ standalone_pdf_extraction.text }}</textarea>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if result %}
+    <div class="card mb-3">
+      <div class="card-header">Scrapped Details</div>
+      <div class="card-body">
+        <div class="mb-2"><span class="text-muted">Page title:</span> <strong>{{ result.page_title }}</strong></div>
+        <div class="mb-2"><span class="text-muted">Content type:</span> {{ result.content_type }}</div>
+        <div class="mb-2"><span class="text-muted">Final URL:</span> <span style="word-break:break-all">{{ result.final_url }}</span></div>
+        <div class="mb-2"><span class="text-muted">Profile used:</span> {{ result.effective_profile }}</div>
+        <div class="mb-2"><span class="text-muted">Links scanned:</span> {{ result.total_links_found }}</div>
+        <div class="mb-0"><span class="text-muted">PDF links found:</span> {{ result.pdf_count }}</div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">Detected Case Signals</div>
+      <div class="card-body">
+        <div class="mb-2"><span class="text-muted">Case numbers:</span></div>
+        {% if result.case_signals.case_numbers %}
+        <ul class="mb-3" style="font-size:13px">
+          {% for cn in result.case_signals.case_numbers %}
+          <li>{{ cn }}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="text-muted mb-3" style="font-size:13px">No case number patterns detected.</div>
+        {% endif %}
+        <div class="mb-2"><span class="text-muted">Dates:</span></div>
+        {% if result.case_signals.dates %}
+        <div style="font-size:13px">{{ result.case_signals.dates|join:", " }}</div>
+        {% else %}
+        <div class="text-muted" style="font-size:13px">No date patterns detected.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">Page Text Preview</div>
+      <div class="card-body">
+        <div class="text-muted mb-2" style="font-size:12px">Page extraction mode: {{ result.extract_mode|default:'text' }}</div>
+        {% if result.extraction_notes %}
+        <div class="alert alert-warning py-2 mb-2" style="font-size:12px">
+          {% for note in result.extraction_notes %}
+          <div>{{ note }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div style="white-space:pre-wrap;font-size:13px;color:#374151;max-height:280px;overflow:auto">{{ result.formatted_text|default:"No preview text extracted." }}</div>
+      </div>
+    </div>
+
+    {% if result.pdf_content_extractions %}
+    <div class="card mb-3 border-info" style="border-width:2px">
+      <div class="card-header" style="background:#e0f2fe;color:#0369a1">
+        <i class="bi bi-file-earmark-text me-1"></i> PDF text extraction (from found links)
+      </div>
+      <div class="card-body p-0">
+        {% for block in result.pdf_content_extractions %}
+        <div class="p-3 {% if not forloop.last %}border-bottom{% endif %}">
+          <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+            <span style="font-size:12px;word-break:break-all;color:#374151">{{ block.url }}</span>
+            {% if block.ok %}
+            <button type="button" class="btn btn-sm btn-outline-secondary shrink-0" onclick="copyPdfBlock('pdfExtract{{ forloop.counter }}')">
+              <i class="bi bi-clipboard"></i>
+            </button>
+            {% endif %}
+          </div>
+          {% if block.error %}
+          <div class="alert alert-warning py-2 mb-0" style="font-size:12px">{{ block.error }}</div>
+          {% endif %}
+          {% if block.text %}
+          <textarea id="pdfExtract{{ forloop.counter }}" class="form-control" rows="10" readonly style="font-size:12px;white-space:pre-wrap">{{ block.text }}</textarea>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if result.order_rows %}
+    <div class="card mb-3 border-danger" style="border-width:2px">
+      <div class="card-header" style="background:#fef2f2;color:#991b1b">
+        <i class="bi bi-table me-1"></i> Delhi High Court order rows
+      </div>
+      <div class="card-body">
+        <p class="text-muted mb-2" style="font-size:13px">These rows are pulled from the page's AJAX response, then can be imported directly into the `CaseDetail` -> `Order PDFs` register.</p>
+        <div class="table-responsive" style="max-height:280px;overflow:auto">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Case No / Order Link</th>
+                <th style="width:120px">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in result.order_rows %}
+              <tr>
+                <td><a href="{{ row.pdf_url }}" target="_blank" rel="noopener">{{ row.link_label|default:row.pdf_url }}</a></td>
+                <td>{{ row.order_date|default:"—" }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-header">PDF Documents</div>
+      <div class="card-body">
+        {% if result.pdf_links %}
+        <p class="text-muted mb-2" style="font-size:13px">Select PDFs below. Use <strong>Extract PDF text</strong> to read content here, or <strong>Import</strong> to attach files to the selected case.</p>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="target_url" value="{{ target_url }}">
+          <input type="hidden" name="case_id" value="{{ selected_case_id }}">
+          <input type="hidden" name="profile" value="{{ options.profile|default:'auto' }}">
+          <input type="hidden" name="timeout_sec" value="{{ options.timeout_sec|default:20 }}">
+          <input type="hidden" name="user_agent" value="{{ options.user_agent }}">
+          <input type="hidden" name="extract_mode" value="{{ options.extract_mode|default:'text' }}">
+          {% if options.follow_embeds %}<input type="hidden" name="follow_embeds" value="1">{% endif %}
+          {% if options.verify_ssl %}<input type="hidden" name="verify_ssl" value="1">{% endif %}
+          <div class="mb-3" style="max-height:240px;overflow:auto">
+            {% for link in result.pdf_links %}
+            <div class="form-check border rounded p-2 mb-2">
+              <input class="form-check-input" type="checkbox" name="selected_pdf_links" value="{{ link }}" id="pdf_{{ forloop.counter }}" checked>
+              <label class="form-check-label" for="pdf_{{ forloop.counter }}" style="font-size:12px;word-break:break-all">
+                <a href="{{ link }}" target="_blank" rel="noopener">{{ link }}</a>
+              </label>
+            </div>
+            {% endfor %}
+          </div>
+          {% if result.order_rows %}
+          <button type="submit" name="action" value="import_order_rows" class="btn w-100 mb-2 text-white" style="background:#991b1b" {% if not selected_case_id %}disabled{% endif %}>
+            <i class="bi bi-journal-arrow-down me-1"></i> Import into CaseDetail Order PDFs
+          </button>
+          {% endif %}
+          <button type="submit" name="action" value="extract_pdf_content" class="btn w-100 mb-2 text-white" style="background:#1d4ed8">
+            <i class="bi bi-file-text me-1"></i> Extract PDF text
+          </button>
+          <button type="submit" name="action" value="import_pdfs" class="btn btn-gold w-100" {% if not selected_case_id %}disabled{% endif %}>
+            <i class="bi bi-download me-1"></i> Import selected PDFs into case
+          </button>
+          {% if not selected_case_id %}
+          <div class="form-text text-danger mt-2">Select a case on the left before importing PDFs.</div>
+          {% endif %}
+        </form>
+        {% else %}
+        <p class="text-muted mb-0">No PDF links detected from this page.</p>
+        {% endif %}
+      </div>
+    </div>
+    {% elif not standalone_pdf_extraction %}
+    <div class="card">
+      <div class="card-body text-center py-5">
+        <div class="text-muted" style="font-size:14px">No page data yet. Use <strong>Fetch Data</strong> on a court URL, or extract a PDF using the <strong>direct PDF URL</strong> panel on the left.</div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+function copyPdfBlock(id) {
+  var el = document.getElementById(id);
+  if (el) { navigator.clipboard.writeText(el.value); }
+}
+</script>
+{% endblock %}

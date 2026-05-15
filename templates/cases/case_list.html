@@ -1,0 +1,523 @@
+{% extends 'base.html' %}
+{% block title %}Cases{% endblock %}
+{% block page_title %}Cases{% endblock %}
+
+{% block content %}
+
+<!-- ══ MOBILE TOPBAR ═══════════════════════════════════════════ -->
+<div class="d-flex d-lg-none align-items-center justify-content-between mb-3 gap-2">
+    <button class="btn btn-outline-secondary btn-sm flex-shrink-0" onclick="openMobileFilters()">
+        <i class="bi bi-funnel me-1"></i>Filters
+        {% if active_statuses or active_projects or active_courts or active_types %}
+        <span class="badge ms-1" style="background:#0f1b35;color:#c9a84c;font-size:9px">
+            {{ active_statuses|length|add:active_projects|length|add:active_courts|length|add:active_types|length }}
+        </span>
+        {% endif %}
+    </button>
+    <div class="d-flex gap-2 flex-shrink-0">
+        <a href="?{{ request.GET.urlencode }}&export=csv" class="btn btn-sm btn-outline-success" title="Export CSV"><i class="bi bi-download"></i></a>
+        <a href="{% url 'case_create' %}" class="btn btn-navy btn-sm"><i class="bi bi-plus-lg me-1"></i>New</a>
+    </div>
+</div>
+
+<!-- ══ LAYOUT WRAPPER ══════════════════════════════════════════ -->
+<div class="case-list-layout">
+
+  <!-- ══ FILTER SIDEBAR ══════════════════════════════════════════ -->
+  <aside class="filter-sidebar" id="filterSidebar">
+    <!-- Mobile header -->
+    <div class="filter-mobile-header d-lg-none">
+        <span class="fw-semibold" style="font-size:15px">Filters</span>
+        <button class="btn-close" onclick="closeMobileFilters()"></button>
+    </div>
+
+    <form method="get" id="filterForm">
+
+      <!-- Search -->
+      <div class="fsec">
+        <div class="fsec-body">
+          <div class="input-group input-group-sm">
+            {{ filter_form.search }}
+            <button class="btn btn-navy btn-sm" type="submit"><i class="bi bi-search"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lawyer -->
+      <div class="fsec">
+        <div class="fsec-head"><i class="bi bi-person me-1"></i>Lawyer</div>
+        <div class="fsec-body">{{ filter_form.assigned_to }}</div>
+      </div>
+
+      <!-- Hearing date range -->
+      <div class="fsec">
+        <div class="fsec-head"><i class="bi bi-calendar-range me-1"></i>Next Hearing</div>
+        <div class="fsec-body">
+          <div class="fslabel">From</div>{{ filter_form.hearing_from }}
+          <div class="fslabel mt-2">To</div>{{ filter_form.hearing_to }}
+        </div>
+      </div>
+
+      <!-- STATUS checkboxes -->
+      <div class="fsec collapsible-sec open">
+        <div class="fsec-head toggle-head" data-sec="secStatus">
+          <span><i class="bi bi-circle-half me-1"></i>Status</span>
+          <div class="d-flex align-items-center gap-1">
+            {% if active_statuses %}<span class="fcnt">{{ active_statuses|length }}</span>{% endif %}
+            <i class="bi bi-chevron-down fsec-chev" id="chevStatus"></i>
+          </div>
+        </div>
+        <div class="fsec-body" id="secStatus">
+          {% for choice in filter_form.status %}
+          <div class="fcheck">
+            <input type="checkbox" class="fchk" id="id_status_{{ forloop.counter }}"
+                   name="status" value="{{ choice.data.value }}"
+                   {% if choice.data.value in active_statuses %}checked{% endif %}>
+            <label for="id_status_{{ forloop.counter }}">
+              {% if choice.data.value == 'in_progress' %}<span class="badge badge-inprogress" style="font-size:10px">In Progress</span>
+              {% elif choice.data.value == 'disposed' %}<span class="badge badge-disposed" style="font-size:10px">Disposed</span>
+              {% else %}<span class="badge badge-hold" style="font-size:10px">On Hold</span>{% endif %}
+            </label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- PROJECT checkboxes -->
+      {% if filter_form.project.field.choices %}
+      <div class="fsec collapsible-sec open">
+        <div class="fsec-head toggle-head" data-sec="secProject">
+          <span><i class="bi bi-folder me-1"></i>Project</span>
+          <div class="d-flex align-items-center gap-1">
+            {% if active_projects %}<span class="fcnt">{{ active_projects|length }}</span>{% endif %}
+            <i class="bi bi-chevron-down fsec-chev" id="chevProject"></i>
+          </div>
+        </div>
+        <div class="fsec-body" id="secProject" style="max-height:130px;overflow-y:auto">
+          {% for choice in filter_form.project %}
+          <div class="fcheck">
+            <input type="checkbox" class="fchk" id="id_proj_{{ forloop.counter }}"
+                   name="project" value="{{ choice.data.value }}"
+                   {% if choice.data.value in active_projects %}checked{% endif %}>
+            <label for="id_proj_{{ forloop.counter }}" style="font-size:12px">{{ choice.data.label }}</label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- COURT checkboxes -->
+      <div class="fsec collapsible-sec">
+        <div class="fsec-head toggle-head" data-sec="secCourt">
+          <span><i class="bi bi-building me-1"></i>Court</span>
+          <div class="d-flex align-items-center gap-1">
+            {% if active_courts %}<span class="fcnt">{{ active_courts|length }}</span>{% endif %}
+            <i class="bi bi-chevron-right fsec-chev" id="chevCourt"></i>
+          </div>
+        </div>
+        <div class="fsec-body" id="secCourt" style="display:none;max-height:150px;overflow-y:auto">
+          {% for choice in filter_form.court %}
+          <div class="fcheck">
+            <input type="checkbox" class="fchk" id="id_court_{{ forloop.counter }}"
+                   name="court" value="{{ choice.data.value }}"
+                   {% if choice.data.value in active_courts %}checked{% endif %}>
+            <label for="id_court_{{ forloop.counter }}" style="font-size:11px;line-height:1.3">{{ choice.data.label }}</label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- CASE TYPE checkboxes -->
+      <div class="fsec collapsible-sec">
+        <div class="fsec-head toggle-head" data-sec="secType">
+          <span><i class="bi bi-tag me-1"></i>Case Type</span>
+          <div class="d-flex align-items-center gap-1">
+            {% if active_types %}<span class="fcnt">{{ active_types|length }}</span>{% endif %}
+            <i class="bi bi-chevron-right fsec-chev" id="chevType"></i>
+          </div>
+        </div>
+        <div class="fsec-body" id="secType" style="display:none;max-height:180px;overflow-y:auto">
+          {% for choice in filter_form.case_type %}
+          <div class="fcheck">
+            <input type="checkbox" class="fchk" id="id_type_{{ forloop.counter }}"
+                   name="case_type" value="{{ choice.data.value }}"
+                   {% if choice.data.value in active_types %}checked{% endif %}>
+            <label for="id_type_{{ forloop.counter }}" style="font-size:12px">{{ choice.data.label }}</label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="d-grid gap-2 mt-3">
+        <button type="submit" class="btn btn-navy btn-sm"><i class="bi bi-funnel-fill me-1"></i>Apply</button>
+        <a href="{% url 'case_list' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-circle me-1"></i>Clear</a>
+      </div>
+    </form>
+  </aside>
+
+  <!-- Backdrop for mobile -->
+  <div class="filter-backdrop" id="filterBackdrop" onclick="closeMobileFilters()"></div>
+
+  <!-- ══ TABLE AREA ══════════════════════════════════════════════ -->
+  <div class="case-table-area">
+
+    <!-- Desktop header bar -->
+    <div class="d-none d-lg-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="text-muted" style="font-size:13px">
+          <strong>{{ cases.start_index }}–{{ cases.end_index }}</strong> of <strong>{{ total_count }}</strong>
+        </span>
+        <!-- active filter pills -->
+        {% for s in active_statuses %}<span class="badge" style="background:#dbeafe;color:#1e40af;font-size:10px">{{ s }}</span>{% endfor %}
+        {% for p in active_projects %}<span class="badge" style="background:#eff6ff;color:#1d4ed8;font-size:10px">{{ p|truncatechars:14 }}</span>{% endfor %}
+        {% for c in active_courts %}<span class="badge bg-secondary" style="font-size:10px">{{ c|truncatechars:14 }}</span>{% endfor %}
+        {% for t in active_types %}<span class="badge" style="background:#f0fdf4;color:#166534;font-size:10px">{{ t }}</span>{% endfor %}
+      </div>
+      <div class="d-flex gap-2">
+        <!-- Change 4: Paste & Fill button -->
+        <button class="btn btn-sm btn-outline-secondary" onclick="openPasteModal()" title="Paste copied case data to pre-fill the Add Case form">
+          <i class="bi bi-clipboard-plus me-1"></i>Paste & Fill
+        </button>
+        <a href="?{{ request.GET.urlencode }}&export=csv" class="btn btn-sm btn-outline-success">
+          <i class="bi bi-download me-1"></i>Export CSV
+        </a>
+        <a href="{% url 'case_create' %}" class="btn btn-navy btn-sm">
+          <i class="bi bi-plus-lg me-1"></i>New Case
+        </a>
+      </div>
+    </div>
+
+    <!-- Mobile count + paste -->
+    <div class="d-flex d-lg-none justify-content-between align-items-center mb-2">
+      <span class="text-muted" style="font-size:12px">{{ total_count }} case{{ total_count|pluralize }}</span>
+      <button class="btn btn-sm btn-outline-secondary" onclick="openPasteModal()" style="font-size:11px">
+        <i class="bi bi-clipboard-plus me-1"></i>Paste & Fill
+      </button>
+    </div>
+
+    <!-- TABLE — Change 3: sortable headers -->
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table mb-0" style="min-width:650px">
+          <thead>
+            <tr>
+              <!-- Sort helper: builds URL preserving all current GET params -->
+              <th>
+                <a href="?{% for k,v in request.GET.items %}{% if k != 'sort' and k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}sort={{ next_sort.case_number }}" class="sort-link">
+                  Case No. <i class="bi {% if current_sort == 'case_number' %}bi-sort-alpha-down text-navy{% elif current_sort == '-case_number' %}bi-sort-alpha-up text-navy{% else %}bi-arrow-down-up text-muted{% endif %}"></i>
+                </a>
+              </th>
+              <th>
+                <a href="?{% for k,v in request.GET.items %}{% if k != 'sort' and k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}sort={{ next_sort.title }}" class="sort-link">
+                  Title <i class="bi {% if current_sort == 'title' %}bi-sort-alpha-down text-navy{% elif current_sort == '-title' %}bi-sort-alpha-up text-navy{% else %}bi-arrow-down-up text-muted{% endif %}"></i>
+                </a>
+              </th>
+              <th class="d-none d-xl-table-cell">Project</th>
+              <th class="d-none d-lg-table-cell">Court</th>
+              <th class="d-none d-lg-table-cell">
+                <a href="?{% for k,v in request.GET.items %}{% if k != 'sort' and k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}sort={{ next_sort.next_hearing_date }}" class="sort-link">
+                  Next Hearing <i class="bi {% if current_sort == 'next_hearing_date' %}bi-sort-numeric-down text-navy{% elif current_sort == '-next_hearing_date' %}bi-sort-numeric-up text-navy{% else %}bi-arrow-down-up text-muted{% endif %}"></i>
+                </a>
+              </th>
+              <th>
+                <a href="?{% for k,v in request.GET.items %}{% if k != 'sort' and k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}sort={{ next_sort.status }}" class="sort-link">
+                  Status <i class="bi {% if current_sort == 'status' %}bi-sort-alpha-down text-navy{% elif current_sort == '-status' %}bi-sort-alpha-up text-navy{% else %}bi-arrow-down-up text-muted{% endif %}"></i>
+                </a>
+              </th>
+              <th class="d-none d-xl-table-cell">Lawyer</th>
+              <th>
+                <a href="?{% for k,v in request.GET.items %}{% if k != 'sort' and k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}sort={{ next_sort.created_at }}" class="sort-link">
+                  Added <i class="bi {% if current_sort == 'created_at' %}bi-sort-numeric-down text-navy{% elif current_sort == '-created_at' %}bi-sort-numeric-up text-navy{% else %}bi-arrow-down-up text-muted{% endif %}"></i>
+                </a>
+              </th>
+              <th class="text-center">Act.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for case in cases %}
+            <tr>
+              <td>
+                <a href="{% url 'case_detail' case.pk %}" class="fw-semibold text-decoration-none" style="color:#0f1b35;font-size:12px">{{ case.case_number }}</a>
+              </td>
+              <td>
+                <div class="fw-semibold" style="font-size:13px;color:#111">{{ case.title|truncatechars:32 }}</div>
+                {% if case.petitioner or case.respondent %}
+                <div class="text-muted" style="font-size:11px">{{ case.petitioner|default:"—"|truncatechars:14 }} vs {{ case.respondent|default:"—"|truncatechars:14 }}</div>
+                {% endif %}
+                <div class="d-lg-none mt-1 d-flex gap-1 flex-wrap">
+                  {% if case.project %}<span class="badge" style="background:#eff6ff;color:#1d4ed8;font-size:10px">{{ case.project|truncatechars:14 }}</span>{% endif %}
+                  <span class="text-muted" style="font-size:11px">{{ case.court_name|truncatechars:16 }}</span>
+                </div>
+              </td>
+              <td class="d-none d-xl-table-cell">
+                {% if case.project %}<span class="badge" style="background:#eff6ff;color:#1d4ed8;font-size:11px">{{ case.project|truncatechars:18 }}</span>
+                {% else %}<span class="text-muted" style="font-size:12px">—</span>{% endif %}
+              </td>
+              <td class="d-none d-lg-table-cell" style="font-size:12px">{{ case.court_name|truncatechars:20 }}</td>
+              <td class="d-none d-lg-table-cell">
+                {% if case.next_hearing_date %}
+                  <div style="font-size:12px">{{ case.next_hearing_date|date:"d M Y" }}</div>
+                  {% if case.is_hearing_upcoming %}
+                  <span class="badge bg-warning text-dark" style="font-size:10px">
+                    {% if case.days_to_hearing == 0 %}Today{% elif case.days_to_hearing == 1 %}Tmrw{% else %}{{ case.days_to_hearing }}d{% endif %}
+                  </span>
+                  {% endif %}
+                {% else %}<span class="text-muted" style="font-size:12px">—</span>{% endif %}
+              </td>
+              <td><span class="badge {{ case.status_badge_class }}" style="font-size:11px;padding:3px 8px">{{ case.get_status_display }}</span></td>
+              <td class="d-none d-xl-table-cell" style="font-size:12px">{{ case.assigned_to.get_full_name|default:case.assigned_to.username|default:"—"|truncatechars:14 }}</td>
+              <td style="font-size:11px;color:#6b7280">{{ case.created_at|date:"d M Y" }}</td>
+              <td class="text-center">
+                <div class="d-flex gap-1 justify-content-center">
+                  <a href="{% url 'case_detail' case.pk %}" class="tbl-btn" title="View"><i class="bi bi-eye"></i></a>
+                  <a href="{% url 'case_edit' case.pk %}" class="tbl-btn tbl-btn-primary" title="Edit"><i class="bi bi-pencil"></i></a>
+                  {% if user.role == 'admin' or user.is_superuser %}
+                  <a href="{% url 'case_delete' case.pk %}" class="tbl-btn tbl-btn-danger" title="Delete"><i class="bi bi-trash"></i></a>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="9" class="text-center py-5">
+                <i class="bi bi-briefcase text-muted" style="font-size:36px;display:block;margin-bottom:10px;opacity:.4"></i>
+                <p class="text-muted mb-2" style="font-size:14px">No cases match your filters.</p>
+                <a href="{% url 'case_create' %}" class="btn btn-navy btn-sm"><i class="bi bi-plus-lg me-1"></i>Add Case</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if cases.has_other_pages %}
+    <nav class="mt-3 d-flex justify-content-center">
+      <ul class="pagination pagination-sm">
+        {% if cases.has_previous %}
+        <li class="page-item"><a class="page-link" href="?{{ request.GET.urlencode }}&page={{ cases.previous_page_number }}"><i class="bi bi-chevron-left"></i></a></li>
+        {% endif %}
+        {% for num in cases.paginator.page_range %}
+          {% if cases.number == num %}<li class="page-item active"><span class="page-link">{{ num }}</span></li>
+          {% elif num > cases.number|add:'-3' and num < cases.number|add:'3' %}
+          <li class="page-item"><a class="page-link" href="?{{ request.GET.urlencode }}&page={{ num }}">{{ num }}</a></li>
+          {% endif %}
+        {% endfor %}
+        {% if cases.has_next %}
+        <li class="page-item"><a class="page-link" href="?{{ request.GET.urlencode }}&page={{ cases.next_page_number }}"><i class="bi bi-chevron-right"></i></a></li>
+        {% endif %}
+      </ul>
+    </nav>
+    {% endif %}
+
+  </div><!-- /table area -->
+</div><!-- /layout -->
+
+<!-- ══ PASTE & FILL MODAL ══════════════════════════════════════ -->
+<div class="modal fade" id="pasteModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:500px">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title mb-0" style="font-family:'Playfair Display',serif;font-size:18px"><i class="bi bi-clipboard-plus me-2"></i>Paste & Fill Case</h5>
+          <p class="text-muted mb-0" style="font-size:12px">Paste text and we'll extract fields for you</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:#374151">
+          Paste any case-related text below (email, document, notes). The system will detect and pre-fill fields like case number, title, court, parties, dates, and description.
+        </p>
+        <textarea id="pasteInput" class="form-control" rows="7"
+          placeholder="Paste case text here…&#10;&#10;Example:&#10;Case No: HC/DEL/2024/001&#10;Title: Ram Kumar vs State of Delhi&#10;Court: High Court of Delhi&#10;Petitioner: Ram Kumar&#10;Respondent: State of Delhi&#10;Filing Date: 15-01-2024&#10;Next Hearing: 20-05-2024"
+          style="font-size:13px;font-family:monospace"></textarea>
+        <div id="pastePreview" class="mt-3" style="display:none"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-sm btn-outline-primary" onclick="previewPaste()"><i class="bi bi-eye me-1"></i>Preview</button>
+        <button class="btn btn-navy btn-sm" onclick="fillFromPaste()"><i class="bi bi-arrow-right me-1"></i>Fill Add Case Form</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+/* ── Layout ─────────────────────────────────────────────────── */
+.case-list-layout { display:flex; gap:20px; align-items:flex-start; }
+.case-table-area  { flex:1; min-width:0; }
+
+/* ── Filter sidebar ────────────────────────────────────────── */
+.filter-sidebar {
+  width:220px; flex-shrink:0;
+  background:white; border:1px solid var(--border);
+  border-radius:12px; padding:12px; position:sticky; top:72px;
+}
+.filter-mobile-header {
+  display:flex; justify-content:space-between; align-items:center;
+  padding-bottom:12px; margin-bottom:8px; border-bottom:1px solid var(--border);
+}
+/* Filter section */
+.fsec { margin-bottom:8px; }
+.fsec-head {
+  font-size:11px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.8px; color:#6b7280; padding:6px 4px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.fsec-head.toggle-head { cursor:pointer; border-radius:6px; }
+.fsec-head.toggle-head:hover { background:#f9fafb; }
+.fsec-body { padding:4px 2px 6px; }
+.fsec-chev { font-size:11px; transition:transform .2s; }
+.fslabel { font-size:11px; color:#6b7280; font-weight:600; margin-bottom:3px; }
+.fcnt { background:#0f1b35; color:#c9a84c; font-size:9px; font-weight:700; border-radius:10px; padding:1px 6px; }
+/* Checkboxes */
+.fcheck { display:flex; align-items:center; gap:7px; padding:3px 0; }
+.fcheck label { cursor:pointer; margin:0; }
+.fchk { width:14px; height:14px; border-radius:3px !important; border:1.5px solid #d1d5db; cursor:pointer; flex-shrink:0; accent-color:#0f1b35; }
+
+/* ── Sort links ────────────────────────────────────────────── */
+.sort-link { color:inherit; text-decoration:none; font-size:11px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; }
+.sort-link:hover { color:#0f1b35; }
+.text-navy { color:#0f1b35 !important; }
+
+/* ── Table action buttons ──────────────────────────────────── */
+.tbl-btn {
+  width:26px; height:26px; border-radius:6px;
+  display:inline-flex; align-items:center; justify-content:center;
+  border:1px solid #e5e7eb; color:#6b7280; text-decoration:none;
+  font-size:12px; transition:all .15s;
+}
+.tbl-btn:hover         { background:#f3f4f6; color:#111; }
+.tbl-btn-primary       { border-color:#bfdbfe; color:#1d4ed8; }
+.tbl-btn-primary:hover { background:#dbeafe; color:#1d4ed8; }
+.tbl-btn-danger        { border-color:#fecaca; color:#dc2626; }
+.tbl-btn-danger:hover  { background:#fee2e2; color:#dc2626; }
+
+/* ── Mobile: sidebar as bottom sheet ──────────────────────── */
+.filter-backdrop {
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,.45);
+  z-index:1040;
+}
+.filter-backdrop.show { display:block; }
+@media (max-width:991.98px) {
+  .case-list-layout { display:block; }
+  .filter-sidebar {
+    position:fixed; bottom:0; left:0; right:0;
+    width:100% !important; max-height:82vh; overflow-y:auto;
+    border-radius:18px 18px 0 0; z-index:1050;
+    transform:translateY(100%); transition:transform .3s cubic-bezier(.4,0,.2,1);
+    padding:16px 16px 24px;
+  }
+  .filter-sidebar.mobile-open { transform:translateY(0); }
+}
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Filter section collapse ──────────────────────────────────
+document.querySelectorAll('.toggle-head').forEach(hd => {
+  hd.addEventListener('click', function() {
+    const id   = this.dataset.sec;
+    const body = document.getElementById(id);
+    const chev = this.querySelector('.fsec-chev');
+    const open = (body.style.display !== 'none');
+    body.style.display = open ? 'none' : 'block';
+    if (chev) chev.className = open ? 'bi bi-chevron-right fsec-chev' : 'bi bi-chevron-down fsec-chev';
+  });
+});
+
+// ── Auto-submit on control change ───────────────────────────
+document.querySelector('[name="assigned_to"]')?.addEventListener('change',()=>document.getElementById('filterForm').submit());
+document.querySelectorAll('[name="hearing_from"],[name="hearing_to"]').forEach(el=>{
+  el.addEventListener('change',()=>document.getElementById('filterForm').submit());
+});
+document.querySelectorAll('.fchk').forEach(cb=>{
+  cb.addEventListener('change',()=>document.getElementById('filterForm').submit());
+});
+
+// ── Mobile filters ───────────────────────────────────────────
+function openMobileFilters() {
+  document.getElementById('filterSidebar').classList.add('mobile-open');
+  document.getElementById('filterBackdrop').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+function closeMobileFilters() {
+  document.getElementById('filterSidebar').classList.remove('mobile-open');
+  document.getElementById('filterBackdrop').classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+// ── Paste & Fill ─────────────────────────────────────────────
+function openPasteModal() {
+  document.getElementById('pasteInput').value = '';
+  document.getElementById('pastePreview').style.display = 'none';
+  new bootstrap.Modal(document.getElementById('pasteModal')).show();
+}
+
+function extractFields(text) {
+  const get = (patterns) => {
+    for (const p of patterns) {
+      const m = text.match(p);
+      if (m) return m[1]?.trim();
+    }
+    return '';
+  };
+  const parseDate = (s) => {
+    if (!s) return '';
+    // Try dd-mm-yyyy or dd/mm/yyyy
+    const m1 = s.match(/(\d{2})[-\/](\d{2})[-\/](\d{4})/);
+    if (m1) return `${m1[3]}-${m1[2]}-${m1[1]}`;
+    // Try yyyy-mm-dd
+    const m2 = s.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (m2) return s;
+    return '';
+  };
+  return {
+    case_number:       get([/case\s*no\.?\s*:?\s*([A-Z0-9\/\-\.]+)/i, /case\s*number\s*:?\s*([A-Z0-9\/\-\.]+)/i]),
+    title:             get([/title\s*:?\s*(.+)/i, /matter\s*:?\s*(.+)/i]),
+    court_name:        get([/court\s*:?\s*(.+)/i, /before\s+(?:the\s+)?(.+court.+)/i]),
+    petitioner:        get([/petitioner\s*:?\s*(.+)/i, /plaintiff\s*:?\s*(.+)/i, /applicant\s*:?\s*(.+)/i]),
+    respondent:        get([/respondent\s*:?\s*(.+)/i, /defendant\s*:?\s*(.+)/i, /opposite\s+party\s*:?\s*(.+)/i]),
+    filing_date:       parseDate(get([/filing\s*date\s*:?\s*([\d\-\/]+)/i, /filed\s*on\s*:?\s*([\d\-\/]+)/i])),
+    next_hearing_date: parseDate(get([/next\s*hearing\s*:?\s*([\d\-\/]+)/i, /hearing\s*date\s*:?\s*([\d\-\/]+)/i, /listed\s*on\s*:?\s*([\d\-\/]+)/i])),
+    last_hearing_date: parseDate(get([/last\s*hearing\s*:?\s*([\d\-\/]+)/i, /previous\s*hearing\s*:?\s*([\d\-\/]+)/i])),
+    project:           get([/project\s*:?\s*(.+)/i, /matter\s+group\s*:?\s*(.+)/i]),
+    description:       get([/description\s*:?\s*(.+)/i, /subject\s*:?\s*(.+)/i, /brief\s*:?\s*(.+)/i]),
+  };
+}
+
+function previewPaste() {
+  const text = document.getElementById('pasteInput').value;
+  const f    = extractFields(text);
+  const rows = Object.entries({
+    'Case Number': f.case_number, 'Title': f.title, 'Court': f.court_name,
+    'Petitioner': f.petitioner, 'Respondent': f.respondent,
+    'Filing Date': f.filing_date, 'Next Hearing': f.next_hearing_date,
+    'Last Hearing': f.last_hearing_date, 'Project': f.project, 'Description': f.description,
+  }).filter(([k,v])=>v).map(([k,v])=>`
+    <tr><td style="font-size:12px;font-weight:600;color:#6b7280;padding:4px 8px;white-space:nowrap">${k}</td>
+        <td style="font-size:12px;padding:4px 8px">${v}</td></tr>`).join('');
+  const box = document.getElementById('pastePreview');
+  box.style.display = 'block';
+  box.innerHTML = rows
+    ? `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px">
+         <p style="font-size:12px;color:#166534;font-weight:600;margin-bottom:8px"><i class="bi bi-check-circle me-1"></i>Detected fields:</p>
+         <table class="table table-sm mb-0">${rows}</table>
+       </div>`
+    : `<div class="alert alert-warning py-2" style="font-size:13px"><i class="bi bi-exclamation-triangle me-1"></i>No recognisable fields found. Try adding labels like "Case No:", "Court:", "Petitioner:" etc.</div>`;
+}
+
+function fillFromPaste() {
+  const text = document.getElementById('pasteInput').value;
+  const f    = extractFields(text);
+  // Encode and redirect to add case form with pre-filled data
+  const params = new URLSearchParams({ paste_data: JSON.stringify(f) });
+  bootstrap.Modal.getInstance(document.getElementById('pasteModal'))?.hide();
+  window.location.href = '{% url "case_create" %}?' + params.toString();
+}
+</script>
+{% endblock %}

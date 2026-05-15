@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}LegalCRM{% endblock %} — Legal Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --sidebar-width: 256px;
+            --topbar-h: 60px;
+            --navy: #0f1b35;
+            --navy-light: #1a2d52;
+            --gold: #c9a84c;
+            --gold-light: #e8c96d;
+            --cream: #f5f4f0;
+            --text-dark: #1a1a2e;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --sidebar-hover: rgba(201,168,76,0.13);
+        }
+        *, *::before, *::after { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--cream);
+            color: var(--text-dark);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ══ SIDEBAR ════════════════════════════════════════════ */
+        #sidebar {
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: var(--navy);
+            position: fixed;
+            top: 0; left: 0;
+            z-index: 1040;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.28s cubic-bezier(.4,0,.2,1), width 0.28s ease;
+            overflow: hidden;
+        }
+        /* Collapsed state on desktop */
+        body.sidebar-collapsed #sidebar { width: 64px; }
+        body.sidebar-collapsed #main-content { margin-left: 64px; }
+        body.sidebar-collapsed .sidebar-brand .brand-text,
+        body.sidebar-collapsed .nav-section-title,
+        body.sidebar-collapsed .sidebar-nav .nav-link span,
+        body.sidebar-collapsed .user-info { display: none !important; }
+        body.sidebar-collapsed .sidebar-nav .nav-link { justify-content: center; padding: 10px 0; }
+        body.sidebar-collapsed .sidebar-nav .nav-link i { width: auto; font-size: 18px; }
+        body.sidebar-collapsed .sidebar-brand { justify-content: center; padding: 20px 0; }
+        body.sidebar-collapsed .user-card { justify-content: center; }
+
+        .sidebar-brand {
+            padding: 18px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+            min-height: var(--topbar-h);
+        }
+        .brand-icon {
+            width: 36px; height: 36px;
+            background: var(--gold);
+            border-radius: 9px;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--navy); font-size: 18px; font-weight: 700;
+            flex-shrink: 0;
+        }
+        .brand-name { font-family:'Playfair Display',serif; font-size:18px; font-weight:700; color:white; line-height:1.1; }
+        .brand-sub  { font-size:10px; color:rgba(255,255,255,0.38); text-transform:uppercase; letter-spacing:1px; }
+
+        .sidebar-nav { padding: 12px 10px; flex: 1; overflow-y: auto; overflow-x: hidden; }
+        .sidebar-nav::-webkit-scrollbar { width: 4px; }
+        .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+        .nav-section-title {
+            font-size: 10px; font-weight: 700;
+            color: rgba(255,255,255,0.28);
+            text-transform: uppercase; letter-spacing: 1.5px;
+            padding: 14px 8px 5px; white-space: nowrap;
+        }
+        .sidebar-nav .nav-link {
+            display: flex; align-items: center; gap: 10px;
+            padding: 9px 12px; border-radius: 8px;
+            color: rgba(255,255,255,0.62);
+            font-size: 13.5px; font-weight: 400;
+            text-decoration: none; transition: all 0.18s;
+            margin-bottom: 1px; white-space: nowrap;
+        }
+        .sidebar-nav .nav-link:hover { background: var(--sidebar-hover); color: var(--gold-light); }
+        .sidebar-nav .nav-link.active { background: var(--sidebar-hover); color: var(--gold-light); font-weight: 600; }
+        .sidebar-nav .nav-link i { font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; }
+
+        .sidebar-footer {
+            padding: 12px 10px; border-top: 1px solid rgba(255,255,255,0.08);
+            flex-shrink: 0;
+        }
+        .user-card {
+            display: flex; align-items: center; gap: 10px;
+            padding: 8px 10px; border-radius: 8px;
+            background: rgba(255,255,255,0.05);
+        }
+        .user-avatar {
+            width: 32px; height: 32px; background: var(--gold);
+            border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; color: var(--navy);
+            font-weight: 700; font-size: 13px; flex-shrink: 0;
+        }
+        .user-name { font-size: 12px; font-weight: 600; color: white; line-height: 1.2; }
+        .user-role { font-size: 10px; color: var(--gold); text-transform: capitalize; }
+
+        /* ══ OVERLAY (mobile) ════════════════════════════════════ */
+        #sidebarOverlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.45); z-index: 1039;
+        }
+        #sidebarOverlay.show { display: block; }
+
+        /* ══ MAIN CONTENT ════════════════════════════════════════ */
+        #main-content {
+            margin-left: var(--sidebar-width);
+            min-height: 100vh;
+            display: flex; flex-direction: column;
+            transition: margin-left 0.28s ease;
+        }
+        .topbar {
+            background: white; border-bottom: 1px solid var(--border);
+            padding: 0 20px; height: var(--topbar-h);
+            display: flex; align-items: center; justify-content: space-between;
+            position: sticky; top: 0; z-index: 100;
+        }
+        .topbar-left { display: flex; align-items: center; gap: 12px; }
+        .sidebar-toggle-btn {
+            width: 36px; height: 36px; border-radius: 8px;
+            background: var(--cream); border: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; color: var(--navy); font-size: 18px;
+            transition: all 0.15s; flex-shrink: 0;
+        }
+        .sidebar-toggle-btn:hover { background: var(--navy); color: white; border-color: var(--navy); }
+        .page-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 20px; font-weight: 700; color: var(--navy); margin: 0;
+        }
+        .content-area { padding: 24px; flex: 1; }
+
+        /* ══ CARDS ════════════════════════════════════════════════ */
+        .card { border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); background: white; }
+        .card-header {
+            background: white; border-bottom: 1px solid var(--border);
+            border-radius: 12px 12px 0 0 !important;
+            padding: 14px 18px; font-weight: 600; color: var(--navy); font-size: 14px;
+        }
+
+        /* ══ STAT CARDS ═══════════════════════════════════════════ */
+        .stat-card { border-radius: 14px; padding: 20px 22px; color: white; position: relative; overflow: hidden; }
+        .stat-card::before {
+            content:''; position:absolute; top:-20px; right:-20px;
+            width:90px; height:90px; border-radius:50%; background:rgba(255,255,255,0.08);
+        }
+        .stat-card .stat-icon { font-size: 28px; opacity: 0.85; }
+        .stat-card .stat-number { font-size: 32px; font-weight: 700; font-family:'Playfair Display',serif; line-height:1; }
+        .stat-card .stat-label  { font-size: 12px; opacity: 0.8; margin-top: 3px; }
+        .stat-navy  { background: linear-gradient(135deg,#0f1b35,#1a2d52); }
+        .stat-gold  { background: linear-gradient(135deg,#b8860b,#c9a84c); }
+        .stat-green { background: linear-gradient(135deg,#065f46,#059669); }
+        .stat-orange{ background: linear-gradient(135deg,#92400e,#d97706); }
+
+        /* ══ BADGES ═══════════════════════════════════════════════ */
+        .badge-inprogress { background:#dbeafe; color:#1e40af; font-weight:600; }
+        .badge-pending  { background:#fef3c7; color:#92400e; font-weight:600; }
+        .badge-disposed { background:#d1fae5; color:#065f46; font-weight:600; }
+        .badge-hold     { background:#fee2e2; color:#991b1b; font-weight:600; }
+
+        /* ══ TABLE ════════════════════════════════════════════════ */
+        .table th {
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.5px; color: var(--text-muted);
+            border-bottom: 1px solid var(--border); padding: 10px 14px; white-space: nowrap;
+        }
+        .table td { padding: 11px 14px; vertical-align: middle; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
+        .table tbody tr:hover { background: #fafafa; }
+
+        /* ══ TIMELINE ═════════════════════════════════════════════ */
+        .timeline { position: relative; }
+        .timeline::before { content:''; position:absolute; left:20px; top:0; bottom:0; width:2px; background:var(--border); }
+        .timeline-item { position:relative; padding-left:52px; margin-bottom:22px; }
+        .timeline-dot {
+            position:absolute; left:12px; top:4px;
+            width:18px; height:18px; border-radius:50%;
+            background:var(--navy); border:3px solid white;
+            box-shadow:0 0 0 2px var(--navy);
+        }
+        .timeline-item.latest .timeline-dot { background:var(--gold); box-shadow:0 0 0 2px var(--gold); }
+        .timeline-card { background:white; border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
+        .timeline-item.latest .timeline-card { border-color:var(--gold); border-left:3px solid var(--gold); }
+
+        /* ══ BUTTONS ══════════════════════════════════════════════ */
+        .btn-navy { background:var(--navy); color:white; border:none; }
+        .btn-navy:hover { background:var(--navy-light); color:white; }
+        .btn-gold { background:var(--gold); color:var(--navy); border:none; font-weight:600; }
+        .btn-gold:hover { background:var(--gold-light); color:var(--navy); }
+
+        /* ══ MISC ═════════════════════════════════════════════════ */
+        .alert { border-radius: 10px; border: none; font-size: 14px; }
+        .hearing-alert {
+            background: linear-gradient(135deg,#fff7ed,#fef3c7);
+            border:1px solid #fcd34d; border-radius:10px; padding:12px 14px; margin-bottom:8px;
+        }
+        .doc-card { border:1px solid var(--border); border-radius:10px; padding:14px; transition:all 0.2s; }
+        .doc-card:hover { border-color:var(--gold); box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+        .comment-item { padding:12px 0; border-bottom:1px solid #f3f4f6; }
+        .comment-item:last-child { border-bottom:none; }
+        .comment-avatar {
+            width:34px; height:34px; background:var(--navy-light); border-radius:50%;
+            display:flex; align-items:center; justify-content:center;
+            color:var(--gold); font-weight:700; font-size:12px; flex-shrink:0;
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: var(--gold); box-shadow: 0 0 0 3px rgba(201,168,76,0.15);
+        }
+        .pagination .page-link { color:var(--navy); border-radius:6px; margin:0 2px; }
+        .pagination .page-item.active .page-link { background:var(--navy); border-color:var(--navy); }
+
+
+        /* Notification dropdown */
+        .notif-dropdown {
+            position:absolute; right:0; top:calc(100% + 8px);
+            width:320px; background:white; border:1px solid var(--border);
+            border-radius:12px; box-shadow:0 8px 30px rgba(0,0,0,0.12);
+            z-index:500; overflow:hidden;
+        }
+        .notif-header {
+            display:flex; justify-content:space-between; align-items:center;
+            padding:12px 16px; border-bottom:1px solid var(--border);
+        }
+        .notif-item {
+            display:flex; gap:10px; padding:10px 14px;
+            border-bottom:1px solid #f3f4f6; cursor:pointer; transition:background .15s;
+            text-decoration:none; color:inherit;
+        }
+        .notif-item:hover { background:#fafafa; }
+        .notif-item.unread { background:#fefce8; }
+        .notif-item.unread:hover { background:#fef9c3; }
+        .notif-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px; }
+        .nd-hearing  { background:#dc2626; }
+        .nd-deadline { background:#d97706; }
+        .nd-task     { background:#2563eb; }
+        .nd-overdue  { background:#7c3aed; }
+        .nd-update   { background:#059669; }
+        .nd-system   { background:#6b7280; }
+        .notif-empty { padding:24px 16px; text-align:center; color:#9ca3af; font-size:13px; }
+        .notif-footer { padding:10px 16px; border-top:1px solid var(--border); text-align:center; }
+        .badge-dl-critical { background:#fee2e2;color:#991b1b;font-weight:600; }
+        .badge-dl-high     { background:#fef3c7;color:#92400e;font-weight:600; }
+        .badge-dl-medium   { background:#dbeafe;color:#1e40af;font-weight:600; }
+        .badge-dl-low      { background:#f0fdf4;color:#166534;font-weight:600; }
+
+        /* ══ RESPONSIVE ═══════════════════════════════════════════ */
+        @media (max-width: 991.98px) {
+            #sidebar { transform: translateX(-100%); }
+            #sidebar.mobile-open { transform: translateX(0); }
+            #main-content { margin-left: 0 !important; }
+            body.sidebar-collapsed #sidebar { width: var(--sidebar-width); transform: translateX(-100%); }
+            body.sidebar-collapsed #sidebar.mobile-open { transform: translateX(0); }
+            .content-area { padding: 16px; }
+            .page-title { font-size: 17px; }
+        }
+        @media (max-width: 575.98px) {
+            .topbar { padding: 0 12px; }
+            .content-area { padding: 12px; }
+            .stat-card .stat-number { font-size: 26px; }
+        }
+
+
+        /* Case outcome badges */
+        .badge-outcome-won       { background:#d1fae5; color:#065f46; font-weight:600; }
+        .badge-outcome-lost      { background:#fee2e2; color:#991b1b; font-weight:600; }
+        .badge-outcome-settled   { background:#dbeafe; color:#1e40af; font-weight:600; }
+        .badge-outcome-withdrawn { background:#fef3c7; color:#92400e; font-weight:600; }
+        .badge-outcome-dismissed { background:#f3f4f6; color:#374151; font-weight:600; }
+        .badge-outcome-other     { background:#f3f4f6; color:#374151; font-weight:600; }
+        /* Win rate bar */
+        .win-bar-wrap { height:6px; background:#f3f4f6; border-radius:3px; overflow:hidden; }
+        .win-bar-fill { height:100%; border-radius:3px; background:#059669; }
+
+        /* Deadline & Task items */
+        .deadline-list, .task-list { display:flex; flex-direction:column; gap:10px; }
+        .deadline-item, .task-item {
+            background:white; border:1px solid var(--border);
+            border-radius:10px; padding:14px 16px;
+        }
+        .dl-overdue  { border-left:3px solid #dc2626; background:#fff5f5; }
+        .dl-critical { border-left:3px solid #d97706; background:#fffbeb; }
+        .dl-warning  { border-left:3px solid #c9a84c; }
+        .dl-done     { background:#f9fafb; opacity:.75; }
+        .task-done   { background:#f9fafb; opacity:.75; }
+        .task-overdue{ border-left:3px solid #dc2626; background:#fff5f5; }
+
+
+        /* ── Prompt chips (Hearing AI modal) ─────────────────── */
+        .prompt-chip {
+            background: white; border: 1.5px solid #e9d5ff;
+            color: #5b21b6; border-radius: 20px;
+            padding: 5px 14px; font-size: 12px; font-weight: 500;
+            cursor: pointer; transition: all .15s; white-space: nowrap;
+        }
+        .prompt-chip:hover { background: #5b21b6; color: white; border-color: #5b21b6; }
+
+        /* ══ LEGI CHATBOT ═════════════════════════════════════════ */
+        #legiBubble {
+            position: fixed; bottom: 24px; right: 24px;
+            width: 54px; height: 54px; border-radius: 50%;
+            background: linear-gradient(135deg, #0f1b35, #1a2d52);
+            color: #c9a84c; font-size: 22px; border: none;
+            box-shadow: 0 4px 20px rgba(15,27,53,0.35);
+            cursor: pointer; z-index: 9998;
+            display: flex; align-items: center; justify-content: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        #legiBubble:hover { transform: scale(1.08); box-shadow: 0 6px 28px rgba(15,27,53,0.45); }
+        .legi-badge {
+            position: absolute; top: -4px; right: -4px;
+            background: #c9a84c; color: #0f1b35;
+            font-size: 9px; font-weight: 700; border-radius: 10px;
+            padding: 2px 5px; letter-spacing: .3px;
+        }
+        #legiChat {
+            position: fixed; bottom: 88px; right: 24px;
+            width: 370px; max-height: 580px;
+            background: white; border-radius: 18px;
+            box-shadow: 0 16px 60px rgba(0,0,0,0.18);
+            border: 1px solid #e5e7eb;
+            display: flex; flex-direction: column;
+            z-index: 9999; overflow: hidden;
+            opacity: 0; transform: translateY(16px) scale(0.97);
+            pointer-events: none;
+            transition: opacity 0.22s ease, transform 0.22s ease;
+        }
+        #legiChat.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: all; }
+        .legi-header {
+            background: linear-gradient(135deg, #0f1b35, #1a2d52);
+            padding: 14px 16px;
+            display: flex; align-items: center; justify-content: space-between;
+            flex-shrink: 0;
+        }
+        .legi-header-left { display: flex; align-items: center; gap: 10px; }
+        .legi-avatar {
+            width: 34px; height: 34px; border-radius: 50%;
+            background: #c9a84c; color: #0f1b35;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 15px; flex-shrink: 0;
+        }
+        .legi-title { font-size: 14px; font-weight: 700; color: white; font-family: 'Playfair Display', serif; }
+        .legi-status { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 1px; }
+        .legi-close {
+            background: rgba(255,255,255,0.1); border: none; color: white;
+            width: 28px; height: 28px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 13px; transition: background .15s;
+        }
+        .legi-close:hover { background: rgba(255,255,255,0.22); }
+
+        /* Tab bar: Chat / History */
+        .legi-tabs {
+            display: flex; border-bottom: 1px solid #f3f4f6;
+            background: #fafafa; flex-shrink: 0;
+        }
+        .legi-tab {
+            flex: 1; padding: 9px; font-size: 12px; font-weight: 600;
+            color: #9ca3af; background: none; border: none;
+            border-bottom: 2px solid transparent; cursor: pointer; transition: all .15s;
+        }
+        .legi-tab.active { color: #0f1b35; border-bottom-color: #c9a84c; }
+
+        .legi-panel { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+        .legi-panel.active { display: flex; }
+
+        .legi-messages {
+            flex: 1; overflow-y: auto; padding: 14px 14px 6px;
+            display: flex; flex-direction: column; gap: 10px;
+            scroll-behavior: smooth;
+        }
+        .legi-messages::-webkit-scrollbar { width: 4px; }
+        .legi-messages::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 2px; }
+
+        .legi-msg { display: flex; flex-direction: column; max-width: 84%; }
+        .legi-msg.user { align-self: flex-end; align-items: flex-end; }
+        .legi-msg.bot  { align-self: flex-start; align-items: flex-start; }
+        .legi-bubble {
+            padding: 10px 13px; border-radius: 14px;
+            font-size: 13px; line-height: 1.55; word-break: break-word;
+        }
+        .legi-msg.user .legi-bubble {
+            background: linear-gradient(135deg, #0f1b35, #1a2d52);
+            color: white; border-bottom-right-radius: 4px;
+        }
+        .legi-msg.bot .legi-bubble {
+            background: #f3f4f6; color: #1a1a2e;
+            border-bottom-left-radius: 4px;
+        }
+        .legi-msg.bot .legi-bubble a {
+            color: #c9a84c; font-weight: 600; text-decoration: none;
+        }
+        .legi-msg.bot .legi-bubble a:hover { text-decoration: underline; }
+        /* Clickable nav response */
+        .legi-nav-link {
+            display: inline-flex; align-items: center; gap: 6px;
+            margin-top: 8px; padding: 7px 14px; border-radius: 8px;
+            background: #0f1b35; color: #c9a84c !important;
+            font-size: 12px; font-weight: 700; text-decoration: none !important;
+            transition: background .15s;
+        }
+        .legi-nav-link:hover { background: #1a2d52 !important; }
+        .legi-time { font-size: 10px; color: #9ca3af; margin-top: 3px; padding: 0 2px; }
+
+        /* Typing dots */
+        .legi-dots { display: flex; gap: 4px; align-items: center; padding: 2px 0; }
+        .legi-dots span {
+            width: 6px; height: 6px; background: #9ca3af; border-radius: 50%;
+            animation: legiDot 1.2s infinite ease-in-out;
+        }
+        .legi-dots span:nth-child(2) { animation-delay: .2s; }
+        .legi-dots span:nth-child(3) { animation-delay: .4s; }
+        @keyframes legiDot { 0%,80%,100%{transform:scale(0.7);opacity:.5} 40%{transform:scale(1);opacity:1} }
+
+        .legi-quick-btns {
+            padding: 8px 12px; display: flex; flex-wrap: wrap; gap: 6px;
+            border-top: 1px solid #f3f4f6; flex-shrink: 0;
+        }
+        .legi-quick-btn {
+            background: #f3f4f6; border: none; border-radius: 20px;
+            font-size: 11px; font-weight: 500; color: #374151;
+            padding: 5px 11px; cursor: pointer; transition: all .15s;
+        }
+        .legi-quick-btn:hover { background: #0f1b35; color: #c9a84c; }
+        .legi-input-row {
+            display: flex; gap: 8px; padding: 10px 12px;
+            border-top: 1px solid #f3f4f6; flex-shrink: 0;
+        }
+        .legi-input {
+            flex: 1; border: 1.5px solid #e5e7eb; border-radius: 10px;
+            padding: 8px 12px; font-size: 13px; outline: none;
+            font-family: 'DM Sans', sans-serif; transition: border-color .15s;
+        }
+        .legi-input:focus { border-color: #c9a84c; }
+        .legi-send {
+            width: 36px; height: 36px; border-radius: 10px;
+            background: #0f1b35; color: #c9a84c; border: none;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: background .15s; flex-shrink: 0;
+        }
+        .legi-send:hover { background: #1a2d52; }
+
+        /* History panel */
+        .legi-history-list {
+            flex: 1; overflow-y: auto; padding: 10px;
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .legi-history-list::-webkit-scrollbar { width: 4px; }
+        .legi-history-list::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 2px; }
+        .legi-history-item {
+            padding: 10px 12px; border-radius: 10px; cursor: pointer;
+            border: 1px solid #e5e7eb; transition: all .15s;
+        }
+        .legi-history-item:hover { border-color: #c9a84c; background: #fffbf0; }
+        .legi-history-q { font-size: 12px; font-weight: 600; color: #0f1b35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .legi-history-a { font-size: 11px; color: #6b7280; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .legi-history-t { font-size: 10px; color: #9ca3af; margin-top: 4px; }
+        .legi-history-empty { text-align: center; padding: 30px 16px; color: #9ca3af; font-size: 12px; }
+        .legi-history-clear {
+            margin: 8px; padding: 7px; border-radius: 8px;
+            background: #fee2e2; color: #991b1b; border: none;
+            font-size: 11px; font-weight: 600; cursor: pointer; transition: background .15s;
+        }
+        .legi-history-clear:hover { background: #fecaca; }
+
+        @media (max-width: 430px) {
+            #legiChat { width: calc(100vw - 24px); right: 12px; bottom: 80px; }
+            #legiBubble { right: 12px; bottom: 16px; }
+        }
+
+    </style>
+</head>
+<body>
+
+{% if user.is_authenticated %}
+
+<!-- Overlay for mobile -->
+<div id="sidebarOverlay" onclick="closeMobileSidebar()"></div>
+
+<!-- ══ SIDEBAR ══════════════════════════════════════════════════ -->
+<div id="sidebar">
+    <div class="sidebar-brand">
+        <span class="brand-icon">⚖</span>
+        <div class="brand-text">
+            <div class="brand-name">LegalCRM</div>
+            <div class="brand-sub">Case Management</div>
+        </div>
+    </div>
+
+    <nav class="sidebar-nav">
+        <div class="nav-section-title">Main</div>
+        <a href="{% url 'dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+            <i class="bi bi-grid-1x2-fill"></i><span>Dashboard</span>
+        </a>
+        <a href="{% url 'case_list' %}" class="nav-link {% if 'case' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="bi bi-briefcase-fill"></i><span>All Cases</span>
+        </a>
+        <a href="{% url 'manage_documents' %}" class="nav-link {% if request.resolver_match.url_name == 'manage_documents' %}active{% endif %}">
+            <i class="bi bi-folder2-open"></i><span>Manage Documents</span>
+        </a>
+        <a href="{% url 'case_create' %}" class="nav-link">
+            <i class="bi bi-plus-circle-fill"></i><span>New Case</span>
+        </a>
+        <a href="{% url 'workload_dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'workload_dashboard' %}active{% endif %}">
+            <i class="bi bi-bar-chart-line-fill"></i><span>Workload</span>
+        </a>
+        <a href="{% url 'analytics_dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'analytics_dashboard' %}active{% endif %}">
+            <i class="bi bi-graph-up-arrow"></i><span>Analytics</span>
+        </a>
+        <a href="{% url 'web_scrapping' %}" class="nav-link {% if request.resolver_match.url_name == 'web_scrapping' %}active{% endif %}">
+            <i class="bi bi-globe2"></i><span>Web Scrapping</span>
+        </a>
+        <a href="{% url 'notification_list' %}" class="nav-link {% if request.resolver_match.url_name == 'notification_list' %}active{% endif %}">
+            <i class="bi bi-bell-fill"></i><span>Notifications</span>
+            <span id="nav-notif-badge" class="badge ms-auto" style="background:#dc2626;color:white;font-size:9px;display:none">0</span>
+        </a>
+
+        {% if user.role == 'admin' or user.is_superuser %}
+        <div class="nav-section-title">Admin</div>
+        <a href="{% url 'user_list' %}" class="nav-link {% if 'user' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="bi bi-people-fill"></i><span>Users</span>
+        </a>
+        <a href="{% url 'user_create' %}" class="nav-link">
+            <i class="bi bi-person-plus-fill"></i><span>Add User</span>
+        </a>
+        <a href="/admin/" class="nav-link" target="_blank">
+            <i class="bi bi-gear-fill"></i><span>Django Admin</span>
+        </a>
+        {% endif %}
+
+        <div class="nav-section-title">Account</div>
+        <a href="{% url 'profile' %}" class="nav-link">
+            <i class="bi bi-person-circle"></i><span>My Profile</span>
+        </a>
+        {% if user.role == 'client' %}
+        <a href="{% url 'client_portal' %}" class="nav-link {% if 'client' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="bi bi-person-badge-fill"></i><span>My Cases</span>
+        </a>
+        {% endif %}
+        <a href="{% url 'logout' %}" class="nav-link">
+            <i class="bi bi-box-arrow-left"></i><span>Logout</span>
+        </a>
+    </nav>
+
+    <div class="sidebar-footer">
+        <div class="user-card">
+            <div class="user-avatar">{{ user.get_full_name|default:user.username|slice:":1"|upper }}</div>
+            <div class="user-info">
+                <div class="user-name">{{ user.get_full_name|default:user.username }}</div>
+                <div class="user-role">{{ user.get_role_display }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══ MAIN CONTENT ══════════════════════════════════════════════ -->
+<div id="main-content">
+    <!-- Topbar -->
+    <div class="topbar">
+        <div class="topbar-left">
+            <div class="sidebar-toggle-btn" id="sidebarToggleBtn" onclick="toggleSidebar()" title="Toggle sidebar">
+                <i class="bi bi-list" id="toggleIcon"></i>
+            </div>
+            <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <!-- Notification Bell -->
+            <div class="position-relative" style="margin-right:2px">
+                <button class="sidebar-toggle-btn" id="notifBellBtn" title="Notifications" onclick="toggleNotifDropdown()">
+                    <i class="bi bi-bell" style="font-size:16px"></i>
+                </button>
+                <span id="notif-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:9px;padding:2px 5px;display:none">0</span>
+                <div id="notifDropdown" class="notif-dropdown" style="display:none">
+                    <div class="notif-header">
+                        <span class="fw-semibold" style="font-size:13px">Notifications</span>
+                        <button onclick="markAllRead()" class="btn btn-link btn-sm p-0" style="font-size:11px;color:#6b7280">Mark all read</button>
+                    </div>
+                    <div id="notifList"><div class="notif-empty">No notifications</div></div>
+                    <div class="notif-footer">
+                        <a href="/notifications/" style="font-size:12px;color:#0f1b35">View all →</a>
+                    </div>
+                </div>
+            </div>
+            <a href="{% url 'case_create' %}" class="btn btn-gold btn-sm d-none d-sm-inline-flex">
+                <i class="bi bi-plus-lg me-1"></i>New Case
+            </a>
+            <div class="d-flex align-items-center gap-2 ms-1">
+                <div style="width:28px;height:28px;background:var(--navy);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--gold);font-weight:700;font-size:11px">
+                    {{ user.get_full_name|default:user.username|slice:":1"|upper }}
+                </div>
+                <span class="text-muted d-none d-md-inline" style="font-size:13px">{{ user.get_full_name|default:user.username }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-area">
+        {% if messages %}
+        <div class="mb-3">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </div>
+</div>
+
+{% else %}
+{% block auth_content %}{% endblock %}
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// ── Sidebar state management ────────────────────────────────────
+const MOBILE_BP = 992;
+
+function isMobile() { return window.innerWidth < MOBILE_BP; }
+
+function toggleSidebar() {
+    if (isMobile()) {
+        document.getElementById('sidebar').classList.toggle('mobile-open');
+        document.getElementById('sidebarOverlay').classList.toggle('show');
+    } else {
+        document.body.classList.toggle('sidebar-collapsed');
+        localStorage.setItem('sidebarCollapsed', document.body.classList.contains('sidebar-collapsed'));
+        updateToggleIcon();
+    }
+}
+
+function closeMobileSidebar() {
+    document.getElementById('sidebar').classList.remove('mobile-open');
+    document.getElementById('sidebarOverlay').classList.remove('show');
+}
+
+function updateToggleIcon() {
+    const icon = document.getElementById('toggleIcon');
+    if (icon) {
+        icon.className = document.body.classList.contains('sidebar-collapsed')
+            ? 'bi bi-layout-sidebar-inset' : 'bi bi-list';
+    }
+}
+
+// Restore collapsed state on desktop
+document.addEventListener('DOMContentLoaded', function() {
+    if (!isMobile() && localStorage.getItem('sidebarCollapsed') === 'true') {
+        document.body.classList.add('sidebar-collapsed');
+        updateToggleIcon();
+    }
+    // Close sidebar when nav link clicked on mobile
+    document.querySelectorAll('#sidebar .nav-link').forEach(link => {
+        link.addEventListener('click', () => { if (isMobile()) closeMobileSidebar(); });
+    });
+});
+
+window.addEventListener('resize', function() {
+    if (!isMobile()) {
+        document.getElementById('sidebar').classList.remove('mobile-open');
+        document.getElementById('sidebarOverlay').classList.remove('show');
+    }
+});
+</script>
+{% block extra_js %}{% endblock %}
+
+<script>
+// ── Notification bell ─────────────────────────────────────────
+let notifOpen = false;
+function toggleNotifDropdown() {
+    notifOpen = !notifOpen;
+    document.getElementById('notifDropdown').style.display = notifOpen ? 'block' : 'none';
+    if (notifOpen) loadNotifications();
+}
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#notifBellBtn') && !e.target.closest('#notifDropdown')) {
+        notifOpen = false;
+        const d = document.getElementById('notifDropdown');
+        if (d) d.style.display = 'none';
+    }
+});
+const typeColors = { hearing:'nd-hearing', deadline:'nd-deadline', task:'nd-task',
+                     overdue:'nd-overdue', update:'nd-update', system:'nd-system' };
+function loadNotifications() {
+    fetch('/notifications/count/')
+        .then(r => r.json())
+        .then(data => {
+            updateBadge(data.count);
+            const list = document.getElementById('notifList');
+            if (!data.notifications.length) {
+                list.innerHTML = '<div class="notif-empty">All caught up!</div>';
+                return;
+            }
+            list.innerHTML = data.notifications.map(n => {
+                const dot = typeColors[n.notif_type] || 'nd-system';
+                const unread = n.is_read ? '' : ' unread';
+                return `<a href="${n.link || '/notifications/'}" class="notif-item${unread}">
+                    <span class="notif-dot ${dot}"></span>
+                    <div>
+                        <div style="font-size:13px;font-weight:${n.is_read?'400':'600'};color:#111">${n.title}</div>
+                        ${n.message ? `<div style="font-size:11px;color:#6b7280">${n.message}</div>` : ''}
+                        <div style="font-size:10px;color:#9ca3af;margin-top:2px">${n.created_at}</div>
+                    </div>
+                </a>`;
+            }).join('');
+        }).catch(() => {});
+}
+function updateBadge(count) {
+    ['notif-badge','nav-notif-badge'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = count > 9 ? '9+' : count;
+        el.style.display = count > 0 ? 'inline' : 'none';
+    });
+}
+function markAllRead() {
+    fetch('/notifications/read-all/', {
+        method:'POST', headers:{'X-CSRFToken': getCsrf()}
+    }).then(() => { updateBadge(0); loadNotifications(); });
+}
+function getCsrf() {
+    const m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+}
+// Poll every 60 seconds
+function pollNotifications() {
+    fetch('/notifications/count/').then(r=>r.json()).then(d => updateBadge(d.count)).catch(()=>{});
+}
+document.addEventListener('DOMContentLoaded', function() {
+    pollNotifications();
+    setInterval(pollNotifications, 60000);
+});
+</script>
+
+
+{% if user.is_authenticated and user.role != 'client' %}
+<!-- ══ LEGI — AI Chatbot ══════════════════════════════════════ -->
+<button id="legiBubble" onclick="toggleLegi()" title="Ask Legi">
+    ⚖
+    <span class="legi-badge">AI</span>
+</button>
+
+<div id="legiChat">
+    <div class="legi-header">
+        <div class="legi-header-left">
+            <div class="legi-avatar">L</div>
+            <div>
+                <div class="legi-title">Legi</div>
+                <div class="legi-status" id="legiStatusText">Your legal AI assistant</div>
+            </div>
+        </div>
+        <button class="legi-close" onclick="toggleLegi()">✕</button>
+    </div>
+    <div class="legi-tabs">
+        <button class="legi-tab active" id="tabChat" onclick="switchLegiTab('chat')">💬 Chat</button>
+        <button class="legi-tab" id="tabHistory" onclick="switchLegiTab('history')">🕐 History</button>
+    </div>
+    <div class="legi-panel active" id="legiPanelChat">
+        <div class="legi-messages" id="legiMessages"></div>
+        <div class="legi-quick-btns">
+            <button class="legi-quick-btn" onclick="legiSend('Show all cases')">📋 All Cases</button>
+            <button class="legi-quick-btn" onclick="legiSend('Go to dashboard')">🏠 Dashboard</button>
+            <button class="legi-quick-btn" onclick="legiSend('Show workload')">⚖ Workload</button>
+            <button class="legi-quick-btn" onclick="legiSend('Open analytics')">📊 Analytics</button>
+            <button class="legi-quick-btn" onclick="legiSend('Add a new case')">➕ New Case</button>
+            <button class="legi-quick-btn" onclick="legiSend('Show notifications')">🔔 Alerts</button>
+        </div>
+        <div class="legi-input-row">
+            <input class="legi-input" id="legiInput" type="text"
+                placeholder="Ask Legi anything…"
+                onkeydown="if(event.key==='Enter') legiSend()">
+            <button class="legi-send" onclick="legiSend()">
+                <i class="bi bi-send-fill" style="font-size:13px"></i>
+            </button>
+        </div>
+    </div>
+    <div class="legi-panel" id="legiPanelHistory">
+        <div class="legi-history-list" id="legiHistoryList"></div>
+        <button class="legi-history-clear" onclick="clearLegiHistory()">🗑 Clear chat history</button>
+    </div>
+</div>
+
+<script>
+let legiOpen = false;
+let legiMsgs = [];
+const LEGI_STORAGE_KEY = 'legi_history_v2';
+
+const LEGI_GREET = [
+    "Hello! I'm <strong>Legi</strong>, your legal AI assistant. Ask about your cases, or type <code>/ai …</code> for Gemini when your server has an API key.",
+    "Ask me to navigate anywhere, look up a case, or answer legal questions — or click a quick action below.",
+];
+
+function switchLegiTab(tab) {
+    document.getElementById('tabChat').classList.toggle('active', tab === 'chat');
+    document.getElementById('tabHistory').classList.toggle('active', tab === 'history');
+    document.getElementById('legiPanelChat').classList.toggle('active', tab === 'chat');
+    document.getElementById('legiPanelHistory').classList.toggle('active', tab === 'history');
+    if (tab === 'history') renderLegiHistory();
+    if (tab === 'chat') setTimeout(() => document.getElementById('legiInput').focus(), 80);
+}
+
+function toggleLegi() {
+    legiOpen = !legiOpen;
+    document.getElementById('legiChat').classList.toggle('open', legiOpen);
+    if (legiOpen) {
+        if (legiMsgs.length === 0) {
+            LEGI_GREET.forEach((msg, i) => setTimeout(() => legiAppend('bot', msg), i * 550));
+        }
+        setTimeout(() => document.getElementById('legiInput').focus(), 120);
+    }
+}
+
+function legiSend(preset) {
+    const input = document.getElementById('legiInput');
+    const text = (preset || input.value).trim();
+    if (!text) return;
+    input.value = '';
+    legiAppend('user', text);
+    legiThinking();
+    _legiRequest(text);
+}
+
+function legiAppend(role, html, isTyping = false) {
+    const msgs = document.getElementById('legiMessages');
+    const time = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const div = document.createElement('div');
+    div.className = 'legi-msg ' + role;
+    if (isTyping) { div.id = 'legiTyping'; }
+    div.innerHTML =
+        `<div class="legi-bubble">${isTyping
+            ? '<div class="legi-dots"><span></span><span></span><span></span></div>'
+            : html}</div>` +
+        (isTyping ? '' : `<div class="legi-time">${time}</div>`);
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+    if (!isTyping) legiMsgs.push({ role, html, time });
+}
+
+function legiThinking() {
+    document.getElementById('legiStatusText').textContent = 'Legi is thinking…';
+    legiAppend('bot', '', true);
+}
+function legiDoneThinking() {
+    const el = document.getElementById('legiTyping');
+    if (el) el.remove();
+    document.getElementById('legiStatusText').textContent = 'Your legal AI assistant';
+}
+
+async function _legiRequest(userMessage) {
+    try {
+        const res = await fetch('/legi/chat/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': _legiCsrf() },
+            body: JSON.stringify({ message: userMessage })
+        });
+        const data = await res.json();
+        legiDoneThinking();
+
+        if (!data.ok) { legiAppend('bot', 'Sorry, I encountered an error. Please try again.'); return; }
+
+        if (data.type === 'navigate') {
+            const msg = `${data.message}<br><a class="legi-nav-link" href="${data.url}"><i class="bi bi-arrow-right-circle"></i> Go now</a>`;
+            legiAppend('bot', msg);
+            _saveLegiHistory(userMessage, data.message, data.url);
+            return;
+        }
+
+        if (data.type === 'text') {
+            const reply = String(data.message || '—');
+            const html = _escHtml(reply).replace(/\n/g, '<br>');
+            legiAppend('bot', html);
+            _saveLegiHistory(userMessage, reply.slice(0, 120) + (reply.length > 120 ? '…' : ''), null);
+            return;
+        }
+
+        legiAppend('bot', 'Sorry, I could not understand that. Try "pending cases" or paste a case number.');
+    } catch (err) {
+        legiDoneThinking();
+        legiAppend('bot', 'Connection error. Please check your internet and try again.');
+    }
+}
+
+function _saveLegiHistory(question, answer, url) {
+    try {
+        const history = JSON.parse(localStorage.getItem(LEGI_STORAGE_KEY) || '[]');
+        history.unshift({ q: question, a: answer, url: url || null,
+            t: new Date().toLocaleString('en-IN', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) });
+        localStorage.setItem(LEGI_STORAGE_KEY, JSON.stringify(history.slice(0, 40)));
+    } catch(e) {}
+}
+
+function renderLegiHistory() {
+    const list = document.getElementById('legiHistoryList');
+    try {
+        const history = JSON.parse(localStorage.getItem(LEGI_STORAGE_KEY) || '[]');
+        if (!history.length) {
+            list.innerHTML = '<div class="legi-history-empty"><i class="bi bi-chat-dots" style="font-size:28px;display:block;margin-bottom:8px;opacity:.3"></i>No past chats yet</div>';
+            return;
+        }
+        list.innerHTML = history.map((item, i) => `
+            <div class="legi-history-item" onclick="legiLoadHistory(${i})">
+                <div class="legi-history-q">${_escHtml(item.q)}</div>
+                <div class="legi-history-a">${_escHtml(item.a)}</div>
+                ${item.url ? `<a href="${item.url}" class="legi-nav-link" style="font-size:11px;padding:4px 10px;margin-top:5px" onclick="event.stopPropagation()"><i class="bi bi-arrow-right-circle"></i> Go</a>` : ''}
+                <div class="legi-history-t">${item.t}</div>
+            </div>`).join('');
+    } catch(e) { list.innerHTML = '<div class="legi-history-empty">Could not load history.</div>'; }
+}
+
+function legiLoadHistory(i) {
+    try {
+        const history = JSON.parse(localStorage.getItem(LEGI_STORAGE_KEY) || '[]');
+        const item = history[i];
+        if (!item) return;
+        switchLegiTab('chat');
+        legiAppend('user', _escHtml(item.q));
+        let html = _escHtml(item.a).replace(/\n/g, '<br>');
+        if (item.url) html += `<br><a class="legi-nav-link" href="${item.url}"><i class="bi bi-arrow-right-circle"></i> Go</a>`;
+        legiAppend('bot', html);
+    } catch(e) {}
+}
+
+function clearLegiHistory() {
+    if (!confirm('Clear all Legi chat history?')) return;
+    localStorage.removeItem(LEGI_STORAGE_KEY);
+    renderLegiHistory();
+}
+
+function _escHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function _legiCsrf() {
+    const m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+}
+
+document.addEventListener('click', function(e) {
+    if (legiOpen && !e.target.closest('#legiChat') && !e.target.closest('#legiBubble')) {
+        legiOpen = false;
+        document.getElementById('legiChat').classList.remove('open');
+    }
+});
+</script>
+{% endif %}
+
+</body>
+</html>
