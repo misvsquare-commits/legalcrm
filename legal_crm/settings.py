@@ -14,7 +14,9 @@ SECRET_KEY = 'django-insecure-change-this-in-production-use-env-variable'
 DEBUG = True  # Set to False in production
 
 ALLOWED_HOSTS = ['*']  # Restrict in production
-
+CSRF_TRUSTED_ORIGINS = [
+    "https://legalcrm-production.up.railway.app",
+]
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
