@@ -71,14 +71,24 @@ WSGI_APPLICATION = 'legal_crm.wsgi.application'
 #     }
 # }
 # Testing for Railway Start
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': os.environ.get('MYSQLDATABASE'),
+#         'USER': os.environ.get('MYSQLUSER'),
+#         'PASSWORD': os.environ.get('MYSQLPASSWORD'),
+#         'HOST': os.environ.get('MYSQLHOST'),
+#         'PORT': os.environ.get('MYSQLPORT'),
+#     }
+# }
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': os.environ.get('MYSQLDATABASE'),
-        'USER': os.environ.get('MYSQLUSER'),
-        'PASSWORD': os.environ.get('MYSQLPASSWORD'),
-        'HOST': os.environ.get('MYSQLHOST'),
-        'PORT': os.environ.get('MYSQLPORT'),
+        'NAME': 'legal_crm_db',
+        'USER': 'root',
+        'PASSWORD': 'eUISKvmZTBbZVVFFeTrcEzLjFEwfvHoW',
+        'HOST': 'yamabiko.proxy.rlwy.net',
+        'PORT': '56917',
     }
 }
 # End
