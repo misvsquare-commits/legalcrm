@@ -328,6 +328,8 @@ class CaseDocument(models.Model):
     class Meta:
         ordering = ['-uploaded_at']
         verbose_name = 'Case Document'
+        db_table = 'case_documents'
+        
 
     def __str__(self):
         return f"{self.case.case_number} - {self.get_document_type_display()}"
@@ -568,6 +570,7 @@ class CaseHistory(models.Model):
         ordering = ['-changed_at']
         verbose_name = 'Case History'
         verbose_name_plural = 'Case History'
+        db_table = 'case_history'
 
     def __str__(self):
         return f"{self.case.case_number} [{self.action}] {self.changed_at:%d %b %Y %H:%M}"
